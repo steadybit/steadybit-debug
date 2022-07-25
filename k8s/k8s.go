@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"time"
 )
 
 func FindDeployment(cfg *config.Config, namespace string, name string) (*appsv1.Deployment, error) {
@@ -93,6 +94,18 @@ func AddLogs(cfg *config.Config, path string, namespace string, name string) {
 		CommandName: "kubectl",
 		CommandArgs: []string{"logs", "-n", namespace, "--all-containers", name},
 		OutputPath:  path,
+	})
+}
+
+func AddResourceUsage(cfg *config.Config, path string, namespace string, name string) {
+	delay := time.Millisecond * 500
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:                 cfg,
+		CommandName:            "kubectl",
+		CommandArgs:            []string{"top", "pod", "-n", namespace, "--containers", name},
+		OutputPath:             path,
+		Executions:             10,
+		DelayBetweenExecutions: &delay,
 	})
 }
 

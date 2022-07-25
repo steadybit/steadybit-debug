@@ -5,24 +5,42 @@ import (
 	"github.com/steadybit/steadybit_debug/config"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type AddCommandOutputOptions struct {
-	Config      *config.Config
-	CommandName string
-	CommandArgs []string
-	OutputPath  string
+	Config                 *config.Config
+	CommandName            string
+	CommandArgs            []string
+	OutputPath             string
+	Executions             int
+	DelayBetweenExecutions *time.Duration
 }
 
 func AddCommandOutput(opts AddCommandOutputOptions) {
-	cmd := exec.Command(opts.CommandName, opts.CommandArgs...)
-	out, err := cmd.CombinedOutput()
-
-	content := fmt.Sprintf("# Executed command: %s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
-	if err != nil {
-		content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)
+	if opts.Executions < 1 {
+		opts.Executions = 1
 	}
-	content = fmt.Sprintf("%s\n\n%s", content, out)
 
-	WriteToFile(opts.OutputPath, []byte(content))
+	if opts.DelayBetweenExecutions == nil {
+		delay := time.Second
+		opts.DelayBetweenExecutions = &delay
+	}
+
+	content := ""
+
+	for i := 0; i < opts.Executions; i++ {
+		content = fmt.Sprintf("%s\n\n\n# Executed command (execution %d): %s %s", content, i+1, opts.CommandName, strings.Join(opts.CommandArgs, " "))
+
+		cmd := exec.Command(opts.CommandName, opts.CommandArgs...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)
+		}
+		content = fmt.Sprintf("%s\n\n%s", content, out)
+
+		time.Sleep(*opts.DelayBetweenExecutions)
+	}
+
+	WriteToFile(opts.OutputPath, []byte(strings.TrimSpace(content)))
 }
