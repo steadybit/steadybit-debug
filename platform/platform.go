@@ -20,7 +20,7 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 	k8s.AddConfig(cfg, filepath.Join(pathForPlatform, "config.yaml"), "deployment", deployment.Namespace, deployment.Name)
 
 	k8s.ForEachPod(cfg, deployment.Namespace, deployment.Spec.Selector, func(pod *v1.Pod) {
-		pathForPod := filepath.Join(pathForPlatform, "platform", "pods", pod.Name)
+		pathForPod := filepath.Join(pathForPlatform, "pods", pod.Name)
 
 		k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
 		k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
