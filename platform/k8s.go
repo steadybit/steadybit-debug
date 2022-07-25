@@ -13,3 +13,12 @@ func addPlatformDeploymentDescription(config *config.Config) {
 		OutputPath:  []string{"platform", "k8s", "description.txt"},
 	})
 }
+
+func addPlatformDeploymentConfig(config *config.Config) {
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      config,
+		CommandName: "kubectl",
+		CommandArgs: []string{"get", "deployment", "-n", config.Platform.Namespace, "-o", "yaml", config.Platform.Deployment},
+		OutputPath:  []string{"platform", "k8s", "config.yaml"},
+	})
+}

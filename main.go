@@ -16,11 +16,10 @@ func main() {
 
 	// TODO parse config
 	cfg := config.NewConfig()
+	// TODO auto-identify Kubernetes workload coordinates?
 	cfg.Platform.Namespace = "platform"
 	cfg.Agent.Namespace = "steadybit-agent-to-prod"
 	output.AddOutputDirectory(&cfg)
-
-	log.Info().Msgf("Debugging output will be written to %s", cfg.OutputPath)
 
 	output.AddJsonOutput(output.AddJsonOutputOptions{
 		Config:     &cfg,
@@ -29,4 +28,5 @@ func main() {
 	})
 	platform.AddPlatformDebuggingInformation(&cfg)
 	agent.AddAgentDebuggingInformation(&cfg)
+	output.ZipOutputDirectory(&cfg)
 }

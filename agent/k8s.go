@@ -13,3 +13,12 @@ func addAgentDaemonSetDescription(config *config.Config) {
 		OutputPath:  []string{"agent", "k8s", "description.txt"},
 	})
 }
+
+func addAgentDaemonSetConfig(config *config.Config) {
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      config,
+		CommandName: "kubectl",
+		CommandArgs: []string{"get", "daemonset", "-n", config.Agent.Namespace, "-o", "yaml", config.Agent.DaemonSet},
+		OutputPath:  []string{"agent", "k8s", "config.yaml"},
+	})
+}
