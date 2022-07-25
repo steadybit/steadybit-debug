@@ -58,8 +58,13 @@ func addPodOutput(cfg *config.Config, path string, namespace string, selector *m
 	for _, pod := range podList.Items {
 		pathForPod := filepath.Join(path, pod.Name)
 		addDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
-		addConfig(cfg, filepath.Join(pathForPod, "config.yaml"), "pod", pod.Namespace, pod.Name)
+		addConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
 		addLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
+		addEnv(cfg, filepath.Join(pathForPod, "env.yml"), pod.Namespace, pod.Name)
+		addHealth(cfg, filepath.Join(pathForPod, "health.yml"), pod.Namespace, pod.Name)
+		addPrometheusMetrics(cfg, filepath.Join(pathForPod, "prometheus_metrics.txt"), pod.Namespace, pod.Name)
+		addThreadDump(cfg, filepath.Join(pathForPod, "threaddump.yml"), pod.Namespace, pod.Name)
+		addInfo(cfg, filepath.Join(pathForPod, "info.yml"), pod.Namespace, pod.Name)
 	}
 }
 
@@ -89,6 +94,51 @@ func addLogs(cfg *config.Config, path string, namespace string, name string) {
 		Config:      cfg,
 		CommandName: "kubectl",
 		CommandArgs: []string{"logs", "-n", namespace, "--all-containers", name},
+		OutputPath:  path,
+	})
+}
+
+func addEnv(cfg *config.Config, path string, namespace string, name string) {
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      cfg,
+		CommandName: "kubectl",
+		CommandArgs: []string{"exec", "-n", namespace, name, "--", "curl", "-s", "http://localhost:9090/actuator/env"},
+		OutputPath:  path,
+	})
+}
+
+func addHealth(cfg *config.Config, path string, namespace string, name string) {
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      cfg,
+		CommandName: "kubectl",
+		CommandArgs: []string{"exec", "-n", namespace, name, "--", "curl", "-s", "http://localhost:9090/actuator/health"},
+		OutputPath:  path,
+	})
+}
+
+func addPrometheusMetrics(cfg *config.Config, path string, namespace string, name string) {
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      cfg,
+		CommandName: "kubectl",
+		CommandArgs: []string{"exec", "-n", namespace, name, "--", "curl", "-s", "http://localhost:9090/actuator/prometheus"},
+		OutputPath:  path,
+	})
+}
+
+func addThreadDump(cfg *config.Config, path string, namespace string, name string) {
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      cfg,
+		CommandName: "kubectl",
+		CommandArgs: []string{"exec", "-n", namespace, name, "--", "curl", "-s", "http://localhost:9090/actuator/threaddump"},
+		OutputPath:  path,
+	})
+}
+
+func addInfo(cfg *config.Config, path string, namespace string, name string) {
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      cfg,
+		CommandName: "kubectl",
+		CommandArgs: []string{"exec", "-n", namespace, name, "--", "curl", "-s", "http://localhost:9090/actuator/info"},
 		OutputPath:  path,
 	})
 }
