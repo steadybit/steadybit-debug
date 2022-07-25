@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/steadybit/steadybit_debug/config"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -12,7 +11,7 @@ type AddCommandOutputOptions struct {
 	Config      *config.Config
 	CommandName string
 	CommandArgs []string
-	OutputPath  []string
+	OutputPath  string
 }
 
 func AddCommandOutput(opts AddCommandOutputOptions) {
@@ -25,6 +24,5 @@ func AddCommandOutput(opts AddCommandOutputOptions) {
 	}
 	content = fmt.Sprintf("%s\n\n%s", content, out)
 
-	outputFilePath := filepath.Join(opts.Config.OutputPath, filepath.Join(opts.OutputPath...))
-	WriteToFile(outputFilePath, []byte(content))
+	WriteToFile(opts.OutputPath, []byte(content))
 }
