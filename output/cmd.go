@@ -2,7 +2,7 @@ package output
 
 import (
 	"fmt"
-	"github.com/steadybit/steadybit_debug/config"
+	"github.com/steadybit/steadybit-debug/config"
 	"os/exec"
 	"strings"
 	"time"

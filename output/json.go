@@ -3,7 +3,7 @@ package output
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/steadybit/steadybit_debug/config"
+	"github.com/steadybit/steadybit-debug/config"
 	"path/filepath"
 )
 

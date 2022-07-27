@@ -1,4 +1,4 @@
-module github.com/steadybit/steadybit_debug
+module github.com/steadybit/steadybit-debug
 
 go 1.18
 

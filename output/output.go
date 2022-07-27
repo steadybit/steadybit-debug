@@ -3,7 +3,7 @@ package output
 import (
 	"fmt"
 	"github.com/rs/zerolog/log"
-	"github.com/steadybit/steadybit_debug/config"
+	"github.com/steadybit/steadybit-debug/config"
 	"os"
 	"os/exec"
 	"path"
@@ -12,7 +12,7 @@ import (
 )
 
 func AddOutputDirectory(cfg *config.Config) {
-	directoryName := fmt.Sprintf("steadybit_debug_%d", time.Now().Unix())
+	directoryName := fmt.Sprintf("steadybit-debug-%d", time.Now().Unix())
 	cfg.OutputPath = path.Join(cfg.OutputPath, directoryName)
 	err := os.Mkdir(cfg.OutputPath, os.ModePerm)
 	if err != nil {

@@ -2,8 +2,8 @@ package platform
 
 import (
 	"github.com/rs/zerolog/log"
-	"github.com/steadybit/steadybit_debug/config"
-	"github.com/steadybit/steadybit_debug/k8s"
+	"github.com/steadybit/steadybit-debug/config"
+	"github.com/steadybit/steadybit-debug/k8s"
 	v1 "k8s.io/api/core/v1"
 	"path/filepath"
 )

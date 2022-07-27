@@ -3,10 +3,10 @@ package main
 import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/steadybit/steadybit_debug/agent"
-	"github.com/steadybit/steadybit_debug/config"
-	"github.com/steadybit/steadybit_debug/output"
-	"github.com/steadybit/steadybit_debug/platform"
+	"github.com/steadybit/steadybit-debug/agent"
+	"github.com/steadybit/steadybit-debug/config"
+	"github.com/steadybit/steadybit-debug/output"
+	"github.com/steadybit/steadybit-debug/platform"
 	"os"
 )
 
