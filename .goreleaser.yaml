@@ -42,3 +42,14 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+brews:
+  - name: steadybit-debug
+    tap:
+      owner: steadybit
+      name: homebrew-steadybit-debug
+    commit_author:
+      name: bripkens
+      email: ben.blackmore@steadybit.com
+    folder: Formula
+    homepage: https://github.com/steadybit/steadybit-debug
+    description: Tool to gather debugging information from (on-premise) Steadybit platforms and agents
