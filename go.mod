@@ -3,6 +3,7 @@ module github.com/steadybit/steadybit-debug
 go 1.18
 
 require (
+	github.com/jessevdk/go-flags v1.5.0
 	github.com/rs/zerolog v1.27.0
 	k8s.io/api v0.24.3
 	k8s.io/apimachinery v0.24.3

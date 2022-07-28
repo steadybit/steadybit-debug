@@ -21,7 +21,7 @@ func AddOutputDirectory(cfg *config.Config) {
 	}
 
 	hint := ""
-	if cfg.DeleteOutputDirectoryOnCompletion {
+	if !cfg.NoCleanup {
 		hint = " (directory will be deleted on command completion)"
 	}
 	log.Info().Msgf("Debugging output will be collected at %s%s", cfg.OutputPath, hint)

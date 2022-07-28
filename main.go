@@ -15,7 +15,7 @@ func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	cfg := config.LoadConfig()
+	cfg := config.GetConfig()
 	output.AddOutputDirectory(&cfg)
 
 	output.AddJsonOutput(output.AddJsonOutputOptions{
@@ -26,7 +26,7 @@ func main() {
 	gatherInformation(&cfg)
 	output.ZipOutputDirectory(&cfg)
 
-	if cfg.DeleteOutputDirectoryOnCompletion {
+	if !cfg.NoCleanup {
 		err := os.RemoveAll(cfg.OutputPath)
 		if err != nil {
 			log.Warn().Err(err).Msgf("Failed to remove output directory '%s' after completion", cfg.OutputPath)

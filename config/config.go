@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/jessevdk/go-flags"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
@@ -11,25 +12,25 @@ import (
 )
 
 type Config struct {
-	OutputPath                        string           `yaml:"outputPath"`
-	DeleteOutputDirectoryOnCompletion bool             `yaml:"deleteOutputDirectoryOnCompletion"`
-	Kubernetes                        KubernetesConfig `yaml:"kubernetes"`
-	Platform                          PlatformConfig   `yaml:"platform"`
-	Agent                             AgentConfig      `yaml:"agent"`
+	OutputPath string           `yaml:"outputPath" short:"o" long:"output" description:"Path to output directory that will contain the debugging information"`
+	NoCleanup  bool             `yaml:"noCleanup" long:"no-cleanup" description:"Skip output directory deletion on command completion?"`
+	Kubernetes KubernetesConfig `yaml:"kubernetes"`
+	Platform   PlatformConfig   `yaml:"platform"`
+	Agent      AgentConfig      `yaml:"agent"`
 }
 
 type PlatformConfig struct {
-	Deployment string `yaml:"deployment"`
-	Namespace  string `yaml:"namespace"`
+	Deployment string `yaml:"deployment" long:"platform-deployment" description:"Kubernetes deployment name of the Steadybit platform"`
+	Namespace  string `yaml:"namespace" long:"platform-namespace" description:"Kubernetes namespace name of the Steadybit platform"`
 }
 
 type AgentConfig struct {
-	DaemonSet string `yaml:"daemonSet"`
-	Namespace string `yaml:"namespace"`
+	DaemonSet string `yaml:"daemonSet" long:"agent-daemon-set" description:"Kubernetes daemon set name of the Steadybit agent"`
+	Namespace string `yaml:"namespace" long:"agent-namespace" description:"Kubernetes namespace name of the Steadybit agent"`
 }
 
 type KubernetesConfig struct {
-	KubeConfigPath string `yaml:"kubeConfigPath"`
+	KubeConfigPath string `yaml:"kubeConfigPath" long:"kube-config" description:"Path to Kubernetes config"`
 }
 
 func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
@@ -54,8 +55,8 @@ func newConfig() Config {
 	}
 
 	return Config{
-		OutputPath:                        outputPath,
-		DeleteOutputDirectoryOnCompletion: true,
+		OutputPath: outputPath,
+		NoCleanup:  false,
 		Kubernetes: KubernetesConfig{
 			KubeConfigPath: kubeConfigPath,
 		},
@@ -70,7 +71,7 @@ func newConfig() Config {
 	}
 }
 
-func LoadConfig() Config {
+func loadConfig() Config {
 	config := newConfig()
 
 	path := "steadybit-debug.yml"
@@ -88,6 +89,17 @@ func LoadConfig() Config {
 	err = yaml.Unmarshal(fileContent, &config)
 	if err != nil {
 		log.Err(err).Msgf("Failed to parse steadybit-debug configuration from path '%s' as YAML", path)
+		os.Exit(1)
+	}
+
+	return config
+}
+
+func GetConfig() Config {
+	config := loadConfig()
+
+	_, err := flags.Parse(&config)
+	if err != nil {
 		os.Exit(1)
 	}
 
