@@ -76,52 +76,73 @@ it collected for your installation!
 │   ├── config.yaml
 │   ├── description.txt
 │   └── pods
-│       ├── steadybit-agent-n7df7
-│       │   ├── config.yml
-│       │   ├── description.txt
-│       │   ├── env.yml
-│       │   ├── health.yml
-│       │   ├── info.yml
-│       │   ├── logs.txt
-│       │   ├── prometheus_metrics.txt
-│       │   ├── threaddump.yml
-│       │   └── top.txt
-│       └── steadybit-agent-rblrq
+│       └── steadybit-agent-h94gl
 │           ├── config.yml
+│           ├── connection_stats.yml
 │           ├── description.txt
 │           ├── env.yml
 │           ├── health.yml
 │           ├── info.yml
+│           ├── logs-previous.txt
 │           ├── logs.txt
-│           ├── prometheus_metrics.txt
+│           ├── prometheus_metrics.0.txt
+│           ├── prometheus_metrics.1.txt
+│           ├── prometheus_metrics.2.txt
+│           ├── prometheus_metrics.3.txt
+│           ├── prometheus_metrics.4.txt
+│           ├── prometheus_metrics.5.txt
+│           ├── prometheus_metrics.6.txt
+│           ├── prometheus_metrics.7.txt
+│           ├── prometheus_metrics.8.txt
+│           ├── prometheus_metrics.9.txt
+│           ├── self_test.yml
+│           ├── target_stats.yml
 │           ├── threaddump.yml
-│           └── top.txt
+│           ├── top.0.txt
+│           ├── top.1.txt
+│           ├── top.2.txt
+│           ├── top.3.txt
+│           ├── top.4.txt
+│           ├── top.5.txt
+│           ├── top.6.txt
+│           ├── top.7.txt
+│           ├── top.8.txt
+│           └── top.9.txt
 ├── debugging_config.yaml
 └── platform
     ├── config.yaml
     ├── description.txt
     └── pods
-        ├── platform-557cfcd855-8tpjj
-        │   ├── config.yml
-        │   ├── description.txt
-        │   ├── env.yml
-        │   ├── health.yml
-        │   ├── info.yml
-        │   ├── logs.txt
-        │   ├── prometheus_metrics.txt
-        │   ├── threaddump.yml
-        │   └── top.txt
-        └── platform-557cfcd855-mdpvq
+        └── platform-77666d8ff9-pnncs
             ├── config.yml
             ├── description.txt
             ├── env.yml
             ├── health.yml
             ├── info.yml
+            ├── logs-previous.txt
             ├── logs.txt
-            ├── prometheus_metrics.txt
+            ├── prometheus_metrics.0.txt
+            ├── prometheus_metrics.1.txt
+            ├── prometheus_metrics.2.txt
+            ├── prometheus_metrics.3.txt
+            ├── prometheus_metrics.4.txt
+            ├── prometheus_metrics.5.txt
+            ├── prometheus_metrics.6.txt
+            ├── prometheus_metrics.7.txt
+            ├── prometheus_metrics.8.txt
+            ├── prometheus_metrics.9.txt
+            ├── target_stats.yml
             ├── threaddump.yml
-            └── top.txt
+            ├── top.0.txt
+            ├── top.1.txt
+            ├── top.2.txt
+            ├── top.3.txt
+            ├── top.4.txt
+            ├── top.5.txt
+            ├── top.6.txt
+            ├── top.7.txt
+            ├── top.8.txt
+            └── top.9.txt
 
-8 directories, 41 files
-
+6 directories, 65 files
 ```
