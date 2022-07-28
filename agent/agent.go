@@ -7,6 +7,8 @@ import (
 	"github.com/steadybit/steadybit-debug/k8s"
 	v1 "k8s.io/api/core/v1"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 func AddAgentDebuggingInformation(cfg *config.Config) {
@@ -22,11 +24,7 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 
 	k8s.ForEachPod(cfg, daemonSet.Namespace, daemonSet.Spec.Selector, func(pod *v1.Pod) {
 		pathForPod := filepath.Join(pathForAgent, "pods", pod.Name)
-
-		//daemonSet.Spec.Template.Spec.Containers[0].Env
-		// TODO this one can change!
-		// STEADYBIT_HTTP_ENDPOINT_PORT?
-		port := 42899
+		port := identifyPodPort(pod)
 
 		k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
 		k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
@@ -90,4 +88,20 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 			Url:          fmt.Sprintf("http://localhost:%d/discovery/connections/stats", port),
 		})
 	})
+}
+
+func identifyPodPort(pod *v1.Pod) int {
+	for _, container := range pod.Spec.Containers {
+		for _, env := range container.Env {
+			if strings.ToUpper(env.Name) == "STEADYBIT_HTTP_ENDPOINT_PORT" {
+				configuredPort, err := strconv.Atoi(env.Value)
+				if err == nil {
+					return configuredPort
+				}
+			}
+		}
+	}
+
+	// try the default agent port
+	return 42899
 }
