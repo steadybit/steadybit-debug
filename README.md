@@ -1,3 +1,6 @@
+[![CI](https://github.com/steadybit/steadybit-debug/actions/workflows/test.yml/badge.svg)](https://github.com/steadybit/steadybit-debug/actions/workflows/test.yml)
+[![Release](https://github.com/steadybit/steadybit-debug/actions/workflows/release.yml/badge.svg)](https://github.com/steadybit/steadybit-debug/actions/workflows/release.yml)
+
 # steadybit-debug
 
 steadybit-debug collects data from installed Steadybit platforms and
@@ -17,7 +20,7 @@ steadybit-debug is available on Linux, macOS and Windows platforms.
     ```
     brew tap steadybit/homebrew-steadybit-debug
     brew install steadybit-debug
-    ``` 
+    ```
 
 ## Configuration
 
