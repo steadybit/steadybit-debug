@@ -14,11 +14,7 @@ func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	// TODO parse config
-	cfg := config.NewConfig()
-	// TODO auto-identify Kubernetes workload coordinates?
-	cfg.Platform.Namespace = "platform"
-	cfg.Agent.Namespace = "steadybit-agent-to-prod"
+	cfg := config.LoadConfig()
 	output.AddOutputDirectory(&cfg)
 
 	output.AddJsonOutput(output.AddJsonOutputOptions{

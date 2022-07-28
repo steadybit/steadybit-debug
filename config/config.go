@@ -1,6 +1,8 @@
 package config
 
 import (
+	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -9,24 +11,24 @@ import (
 )
 
 type Config struct {
-	OutputPath string           `json:"outputPath"`
-	Kubernetes KubernetesConfig `json:"kubernetes"`
-	Platform   PlatformConfig   `json:"platform"`
-	Agent      AgentConfig      `json:"agent"`
+	OutputPath string           `yaml:"outputPath"`
+	Kubernetes KubernetesConfig `yaml:"kubernetes"`
+	Platform   PlatformConfig   `yaml:"platform"`
+	Agent      AgentConfig      `yaml:"agent"`
 }
 
 type PlatformConfig struct {
-	Deployment string `json:"deployment"`
-	Namespace  string `json:"namespace"`
+	Deployment string `yaml:"deployment"`
+	Namespace  string `yaml:"namespace"`
 }
 
 type AgentConfig struct {
-	DaemonSet string `json:"daemonSet"`
-	Namespace string `json:"namespace"`
+	DaemonSet string `yaml:"daemonSet"`
+	Namespace string `yaml:"namespace"`
 }
 
 type KubernetesConfig struct {
-	KubeConfigPath string `json:"kubeConfigPath"`
+	KubeConfigPath string `yaml:"kubeConfigPath"`
 }
 
 func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
@@ -38,7 +40,7 @@ func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(config)
 }
 
-func NewConfig() Config {
+func newConfig() Config {
 	var kubeConfigPath string
 	if home := homedir.HomeDir(); home != "" {
 		kubeConfigPath = filepath.Join(home, ".kube", "config")
@@ -51,11 +53,35 @@ func NewConfig() Config {
 		},
 		Platform: PlatformConfig{
 			Namespace:  "steadybit-platform",
-			Deployment: "platform",
+			Deployment: "steadybit-platform",
 		},
 		Agent: AgentConfig{
 			Namespace: "steadybit-agent",
 			DaemonSet: "steadybit-agent",
 		},
 	}
+}
+
+func LoadConfig() Config {
+	config := newConfig()
+
+	path := "steadybit-debug.yml"
+	fileContent, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Info().Msgf("No steadybit-debug configuration file found at path '%s'. Will continue with default configuration.", path)
+			return config
+		} else {
+			log.Err(err).Msgf("Failed to load steadybit-debug configuration file from path '%s'", path)
+			os.Exit(1)
+		}
+	}
+
+	err = yaml.Unmarshal(fileContent, &config)
+	if err != nil {
+		log.Err(err).Msgf("Failed to parse steadybit-debug configuration from path '%s' as YAML", path)
+		os.Exit(1)
+	}
+
+	return config
 }
