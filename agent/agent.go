@@ -22,6 +22,8 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 
 	k8s.ForEachPod(cfg, daemonSet.Namespace, daemonSet.Spec.Selector, func(pod *v1.Pod) {
 		pathForPod := filepath.Join(pathForAgent, "pods", pod.Name)
+
+		//daemonSet.Spec.Template.Spec.Containers[0].Env
 		// TODO this one can change!
 		// STEADYBIT_HTTP_ENDPOINT_PORT?
 		port := 42899
@@ -65,6 +67,27 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 			PodNamespace: pod.Namespace,
 			PodName:      pod.Name,
 			Url:          fmt.Sprintf("http://localhost:%d/info", port),
+		})
+		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
+			Config:       cfg,
+			OutputPath:   filepath.Join(pathForPod, "self_test.yml"),
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Url:          fmt.Sprintf("http://localhost:%d/self-test", port),
+		})
+		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
+			Config:       cfg,
+			OutputPath:   filepath.Join(pathForPod, "target_stats.yml"),
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Url:          fmt.Sprintf("http://localhost:%d/discovery/targets/stats", port),
+		})
+		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
+			Config:       cfg,
+			OutputPath:   filepath.Join(pathForPod, "connection_stats.yml"),
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Url:          fmt.Sprintf("http://localhost:%d/discovery/connections/stats", port),
 		})
 	})
 }

@@ -61,5 +61,12 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 			PodName:      pod.Name,
 			Url:          "http://localhost:9090/actuator/info",
 		})
+		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
+			Config:       cfg,
+			OutputPath:   filepath.Join(pathForPod, "target_stats.yml"),
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Url:          "http://localhost:9090/actuator/targetstats",
+		})
 	})
 }

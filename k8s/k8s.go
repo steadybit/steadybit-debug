@@ -118,6 +118,7 @@ type AddPodHttpEndpointOutputOptions struct {
 }
 
 func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
+	// TODO log duration
 	output.AddCommandOutput(output.AddCommandOutputOptions{
 		Config:      options.Config,
 		CommandName: "kubectl",
