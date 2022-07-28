@@ -18,9 +18,8 @@ type AddCommandOutputOptions struct {
 	DelayBetweenExecutions *time.Duration
 }
 
+// AddCommandOutput opts.OutputPath must include a %d to replace the execution number when opts.Executions > 1
 func AddCommandOutput(opts AddCommandOutputOptions) {
-	start := time.Now()
-
 	if opts.Executions < 1 {
 		opts.Executions = 1
 	}
@@ -30,24 +29,35 @@ func AddCommandOutput(opts AddCommandOutputOptions) {
 		opts.DelayBetweenExecutions = &delay
 	}
 
-	content := ""
-
 	for i := 0; i < opts.Executions; i++ {
-		log.Debug().Msgf("Executing: %s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
-		content = fmt.Sprintf("%s\n\n\n# Executed command (execution %d): %s %s", content, i+1, opts.CommandName, strings.Join(opts.CommandArgs, " "))
+		filePath := opts.OutputPath
 
-		cmd := exec.Command(opts.CommandName, opts.CommandArgs...)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)
+		if opts.Executions > 1 {
+			filePath = fmt.Sprintf(filePath, i)
 		}
-		content = fmt.Sprintf("%s\n\n%s", content, out)
+
+		addCommandOutputWithoutLoop(opts, filePath)
 
 		time.Sleep(*opts.DelayBetweenExecutions)
 	}
+}
+
+func addCommandOutputWithoutLoop(opts AddCommandOutputOptions, outputPath string) {
+	start := time.Now()
+
+	log.Debug().Msgf("Executing: %s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
+	content := fmt.Sprintf("# Executed command: %s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
+	content = fmt.Sprintf("%s\n# Started at: %s", content, time.Now().Format(time.RFC3339))
+
+	cmd := exec.Command(opts.CommandName, opts.CommandArgs...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)
+	}
+	content = fmt.Sprintf("%s\n\n%s", content, out)
 
 	totalTime := time.Now().Sub(start)
 	content = fmt.Sprintf("%s\n\n# Total execution time: %d millis", content, totalTime.Milliseconds())
 
-	WriteToFile(opts.OutputPath, []byte(strings.TrimSpace(content)))
+	WriteToFile(outputPath, []byte(strings.TrimSpace(content)))
 }

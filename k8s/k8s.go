@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"sync"
 	"time"
 )
 
@@ -54,6 +55,7 @@ func AddConfig(config *config.Config, outputPath string, kind string, namespace 
 	})
 }
 
+// ForEachPod note that the function fn will be executed in parallel for each pod
 func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSelector, fn func(pod *v1.Pod)) {
 	podList, err := findPods(cfg, namespace, selector)
 	if err != nil {
@@ -61,10 +63,15 @@ func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSele
 		return
 	}
 
+	var wg sync.WaitGroup
 	for _, pod := range podList.Items {
-		log.Debug().Msgf("Gathering information for pod '%s' in namespace '%s'", pod.Name, pod.Namespace)
-		fn(&pod)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			fn(&pod)
+		}()
 	}
+	wg.Wait()
 }
 
 func findPods(cfg *config.Config,
@@ -97,6 +104,7 @@ func AddLogs(cfg *config.Config, path string, namespace string, name string) {
 	})
 }
 
+// AddResourceUsage path must include '%d' to replace the execution number within the file path
 func AddResourceUsage(cfg *config.Config, path string, namespace string, name string) {
 	delay := time.Millisecond * 500
 	output.AddCommandOutput(output.AddCommandOutputOptions{

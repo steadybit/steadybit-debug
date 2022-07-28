@@ -25,7 +25,7 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 		k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
 		k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
 		k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
-		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.txt"), pod.Namespace, pod.Name)
+		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
 			Config:       cfg,
 			OutputPath:   filepath.Join(pathForPod, "env.yml"),
