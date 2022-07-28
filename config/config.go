@@ -46,8 +46,14 @@ func newConfig() Config {
 		kubeConfigPath = filepath.Join(home, ".kube", "config")
 	}
 
+	outputPath := os.TempDir()
+	workingDirectory, err := os.Getwd()
+	if err == nil {
+		outputPath = workingDirectory
+	}
+
 	return Config{
-		OutputPath: os.TempDir(),
+		OutputPath: outputPath,
 		Kubernetes: KubernetesConfig{
 			KubeConfigPath: kubeConfigPath,
 		},

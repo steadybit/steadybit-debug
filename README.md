@@ -43,9 +43,8 @@ the Go `Config` [struct definition](https://github.com/steadybit/steadybit-debug
 ## Execution
 
 You execute the tool via `steadybit-debug`. There are currently no
-supported command-line arguments. Once executed, you will find that the command
-collects debugging information within a [temporary directory](https://pkg.go.dev/os#TempDir)
-(unless instructed otherwise via the `$.outputPath` configuration option).
+supported command-line arguments. Once executed, you will find that the
+command collects debugging information within the current working directory.
 Please send the generated .tar.gz file to your Steadybit contacts.
 
 ![Image showing the execution of the steadybit-debug command on a terminal. Log lines are giving an overview about the expected behavior of the tool.](./example-execution.png)
