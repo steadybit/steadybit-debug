@@ -31,7 +31,6 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 		k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.txt"), pod.Namespace, pod.Name)
 
-		// TODO does not work
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
 			Config:       cfg,
 			OutputPath:   filepath.Join(pathForPod, "env.yml"),
@@ -53,7 +52,6 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 			PodName:      pod.Name,
 			Url:          fmt.Sprintf("http://localhost:%d/prometheus", port),
 		})
-		// TODO does not work
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
 			Config:       cfg,
 			OutputPath:   filepath.Join(pathForPod, "threaddump.yml"),
@@ -61,7 +59,6 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 			PodName:      pod.Name,
 			Url:          fmt.Sprintf("http://localhost:%d/threaddump", port),
 		})
-		// TODO does not work
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
 			Config:       cfg,
 			OutputPath:   filepath.Join(pathForPod, "info.yml"),
