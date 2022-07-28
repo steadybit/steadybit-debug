@@ -11,7 +11,7 @@ import (
 func AddPlatformDebuggingInformation(cfg *config.Config) {
 	deployment, err := k8s.FindDeployment(cfg, cfg.Platform.Namespace, cfg.Platform.Deployment)
 	if err != nil {
-		log.Info().Msgf("Failed to find deployment '%s' in '%s': %s", cfg.Platform.Deployment, cfg.Platform.Namespace, err)
+		log.Warn().Msgf("Failed to find platform deployment '%s' in '%s': %s", cfg.Platform.Deployment, cfg.Platform.Namespace, err)
 		return
 	}
 

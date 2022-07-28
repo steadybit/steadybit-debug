@@ -12,7 +12,7 @@ import (
 func AddAgentDebuggingInformation(cfg *config.Config) {
 	daemonSet, err := k8s.FindDaemonSet(cfg, cfg.Agent.Namespace, cfg.Agent.DaemonSet)
 	if err != nil {
-		log.Info().Msgf("Failed to find daemon set '%s' in '%s': %s", cfg.Agent.DaemonSet, cfg.Agent.Namespace, err)
+		log.Warn().Msgf("Failed to find daemon set '%s' in '%s': %s", cfg.Agent.DaemonSet, cfg.Agent.Namespace, err)
 		return
 	}
 
