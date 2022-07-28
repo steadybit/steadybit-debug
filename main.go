@@ -8,6 +8,7 @@ import (
 	"github.com/steadybit/steadybit-debug/output"
 	"github.com/steadybit/steadybit-debug/platform"
 	"os"
+	"sync"
 )
 
 func main() {
@@ -22,8 +23,7 @@ func main() {
 		Content:    cfg,
 		OutputPath: []string{"debugging_config.yaml"},
 	})
-	platform.AddPlatformDebuggingInformation(&cfg)
-	agent.AddAgentDebuggingInformation(&cfg)
+	gatherInformation(&cfg)
 	output.ZipOutputDirectory(&cfg)
 
 	if cfg.DeleteOutputDirectoryOnCompletion {
@@ -32,4 +32,21 @@ func main() {
 			log.Warn().Err(err).Msgf("Failed to remove output directory '%s' after completion", cfg.OutputPath)
 		}
 	}
+}
+
+func gatherInformation(cfg *config.Config) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		platform.AddPlatformDebuggingInformation(cfg)
+	}()
+
+	go func() {
+		defer wg.Done()
+		agent.AddAgentDebuggingInformation(cfg)
+	}()
+
+	wg.Wait()
 }
