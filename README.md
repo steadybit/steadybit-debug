@@ -26,10 +26,23 @@ users of our Helm charts that haven't renamed the namespaces, deployments
 or daemon sets. If you made changes, you could configure steadybit-debug
 to support your specific setup.
 
-Configuration is supported through a file called `steadybit-debug.yml`
-existing within your current working directory. You may alternatively
-use command line arguments. Refer to `steadybit-debug --help` for more
+### Via Command-Line Arguments
+
+Command-line arguments can be used to change the most common configuration
+options. The following snippet show how to change the references to
+Kubernetes workloads. Refer to `steadybit-debug --help` for more
 information.
+
+```
+steadybit-debug --platform-deployment platform \
+   --platform-namespace platform \
+   --agent-namespace steadybit-agent-to-prod
+```
+
+### Via Configuration Files
+
+Configuration is supported through a file called `steadybit-debug.yml`
+existing within your current working directory.
 
 ```yaml
 platform:
@@ -46,14 +59,7 @@ the Go `Config` [struct definition](https://github.com/steadybit/steadybit-debug
 
 You execute the tool via `steadybit-debug`. Once executed, you will find that the
 command collects debugging information within the current working directory.
-Please send the generated .tar.gz file to your Steadybit contacts. An example
-with command line arguments looks like this:
-
-```
-steadybit-debug --platform-deployment platform \
-   --platform-namespace platform \
-   --agent-namespace steadybit-agent-to-prod
-```
+Please send the generated .tar.gz file to your Steadybit contacts.
 
 ![Image showing the execution of the steadybit-debug command on a terminal. Log lines are giving an overview about the expected behavior of the tool.](./example-execution.png)
 
