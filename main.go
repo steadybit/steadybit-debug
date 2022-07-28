@@ -25,4 +25,11 @@ func main() {
 	platform.AddPlatformDebuggingInformation(&cfg)
 	agent.AddAgentDebuggingInformation(&cfg)
 	output.ZipOutputDirectory(&cfg)
+
+	if cfg.DeleteOutputDirectoryOnCompletion {
+		err := os.RemoveAll(cfg.OutputPath)
+		if err != nil {
+			log.Warn().Err(err).Msgf("Failed to remove output directory '%s' after completion", cfg.OutputPath)
+		}
+	}
 }

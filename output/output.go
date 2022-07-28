@@ -20,7 +20,11 @@ func AddOutputDirectory(cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	log.Info().Msgf("Debugging output will be written to %s", cfg.OutputPath)
+	hint := ""
+	if cfg.DeleteOutputDirectoryOnCompletion {
+		hint = " (directory will be deleted on command completion)"
+	}
+	log.Info().Msgf("Debugging output will be collected at %s%s", cfg.OutputPath, hint)
 }
 
 func ZipOutputDirectory(cfg *config.Config) {

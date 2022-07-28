@@ -11,10 +11,11 @@ import (
 )
 
 type Config struct {
-	OutputPath string           `yaml:"outputPath"`
-	Kubernetes KubernetesConfig `yaml:"kubernetes"`
-	Platform   PlatformConfig   `yaml:"platform"`
-	Agent      AgentConfig      `yaml:"agent"`
+	OutputPath                        string           `yaml:"outputPath"`
+	DeleteOutputDirectoryOnCompletion bool             `yaml:"deleteOutputDirectoryOnCompletion"`
+	Kubernetes                        KubernetesConfig `yaml:"kubernetes"`
+	Platform                          PlatformConfig   `yaml:"platform"`
+	Agent                             AgentConfig      `yaml:"agent"`
 }
 
 type PlatformConfig struct {
@@ -53,7 +54,8 @@ func newConfig() Config {
 	}
 
 	return Config{
-		OutputPath: outputPath,
+		OutputPath:                        outputPath,
+		DeleteOutputDirectoryOnCompletion: true,
 		Kubernetes: KubernetesConfig{
 			KubeConfigPath: kubeConfigPath,
 		},
