@@ -66,10 +66,12 @@ func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSele
 	var wg sync.WaitGroup
 	for _, pod := range podList.Items {
 		wg.Add(1)
-		go func() {
+
+		podForAsyncFunction := pod
+		go func(pod *v1.Pod) {
 			defer wg.Done()
-			fn(&pod)
-		}()
+			fn(pod)
+		}(&podForAsyncFunction)
 	}
 	wg.Wait()
 }
