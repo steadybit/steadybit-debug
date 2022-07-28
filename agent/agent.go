@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func AddAgentDebuggingInformation(cfg *config.Config) {
@@ -25,10 +26,12 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 	k8s.ForEachPod(cfg, daemonSet.Namespace, daemonSet.Spec.Selector, func(pod *v1.Pod) {
 		pathForPod := filepath.Join(pathForAgent, "pods", pod.Name)
 		port := identifyPodPort(pod)
+		delay := time.Millisecond * 500
 
 		k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
 		k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
 		k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
+		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
 
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
@@ -46,11 +49,13 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 			Url:          fmt.Sprintf("http://localhost:%d/health", port),
 		})
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
-			Config:       cfg,
-			OutputPath:   filepath.Join(pathForPod, "prometheus_metrics.txt"),
-			PodNamespace: pod.Namespace,
-			PodName:      pod.Name,
-			Url:          fmt.Sprintf("http://localhost:%d/prometheus", port),
+			Config:                 cfg,
+			OutputPath:             filepath.Join(pathForPod, "prometheus_metrics.%d.txt"),
+			PodNamespace:           pod.Namespace,
+			PodName:                pod.Name,
+			Url:                    fmt.Sprintf("http://localhost:%d/prometheus", port),
+			Executions:             10,
+			DelayBetweenExecutions: &delay,
 		})
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
 			Config:       cfg,

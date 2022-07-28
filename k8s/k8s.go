@@ -104,6 +104,15 @@ func AddLogs(cfg *config.Config, path string, namespace string, name string) {
 	})
 }
 
+func AddPreviousLogs(cfg *config.Config, path string, namespace string, name string) {
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      cfg,
+		CommandName: "kubectl",
+		CommandArgs: []string{"logs", "-n", namespace, "--previous", "--all-containers", name},
+		OutputPath:  path,
+	})
+}
+
 // AddResourceUsage path must include '%d' to replace the execution number within the file path
 func AddResourceUsage(cfg *config.Config, path string, namespace string, name string) {
 	delay := time.Millisecond * 500
@@ -118,18 +127,22 @@ func AddResourceUsage(cfg *config.Config, path string, namespace string, name st
 }
 
 type AddPodHttpEndpointOutputOptions struct {
-	Config       *config.Config
-	OutputPath   string
-	PodNamespace string
-	PodName      string
-	Url          string
+	Config                 *config.Config
+	OutputPath             string
+	PodNamespace           string
+	PodName                string
+	Url                    string
+	Executions             int
+	DelayBetweenExecutions *time.Duration
 }
 
 func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 	output.AddCommandOutput(output.AddCommandOutputOptions{
-		Config:      options.Config,
-		CommandName: "kubectl",
-		CommandArgs: []string{"exec", "-n", options.PodNamespace, options.PodName, "--", "curl", "-s", options.Url},
-		OutputPath:  options.OutputPath,
+		Config:                 options.Config,
+		CommandName:            "kubectl",
+		CommandArgs:            []string{"exec", "-n", options.PodNamespace, options.PodName, "--", "curl", "-s", options.Url},
+		OutputPath:             options.OutputPath,
+		Executions:             options.Executions,
+		DelayBetweenExecutions: options.DelayBetweenExecutions,
 	})
 }
