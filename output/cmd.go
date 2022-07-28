@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"os/exec"
 	"strings"
@@ -18,6 +19,8 @@ type AddCommandOutputOptions struct {
 }
 
 func AddCommandOutput(opts AddCommandOutputOptions) {
+	start := time.Now()
+
 	if opts.Executions < 1 {
 		opts.Executions = 1
 	}
@@ -30,6 +33,7 @@ func AddCommandOutput(opts AddCommandOutputOptions) {
 	content := ""
 
 	for i := 0; i < opts.Executions; i++ {
+		log.Debug().Msgf("Executing: %s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
 		content = fmt.Sprintf("%s\n\n\n# Executed command (execution %d): %s %s", content, i+1, opts.CommandName, strings.Join(opts.CommandArgs, " "))
 
 		cmd := exec.Command(opts.CommandName, opts.CommandArgs...)
@@ -41,6 +45,9 @@ func AddCommandOutput(opts AddCommandOutputOptions) {
 
 		time.Sleep(*opts.DelayBetweenExecutions)
 	}
+
+	totalTime := time.Now().Sub(start)
+	content = fmt.Sprintf("%s\n\n# Total execution time: %d millis", content, totalTime.Milliseconds())
 
 	WriteToFile(opts.OutputPath, []byte(strings.TrimSpace(content)))
 }
