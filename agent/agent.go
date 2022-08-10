@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2022 Steadybit GmbH
+
 package agent
 
 import (
@@ -80,10 +83,31 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 		})
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
 			Config:       cfg,
+			OutputPath:   filepath.Join(pathForPod, "discovery_info.yml"),
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Url:          fmt.Sprintf("http://localhost:%d/discovery/info", port),
+		})
+		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
+			Config:       cfg,
+			OutputPath:   filepath.Join(pathForPod, "targets.yml"),
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Url:          fmt.Sprintf("http://localhost:%d/discovery/targets", port),
+		})
+		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
+			Config:       cfg,
 			OutputPath:   filepath.Join(pathForPod, "target_stats.yml"),
 			PodNamespace: pod.Namespace,
 			PodName:      pod.Name,
 			Url:          fmt.Sprintf("http://localhost:%d/discovery/targets/stats", port),
+		})
+		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
+			Config:       cfg,
+			OutputPath:   filepath.Join(pathForPod, "connections.yml"),
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Url:          fmt.Sprintf("http://localhost:%d/discovery/connections", port),
 		})
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
 			Config:       cfg,
