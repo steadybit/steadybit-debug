@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2022 Steadybit GmbH
+
 package k8s
 
 import (
@@ -95,6 +98,36 @@ func findPods(cfg *config.Config,
 		List(context.Background(), metav1.ListOptions{
 			LabelSelector: labels.SelectorFromSet(selectorMap).String(),
 		})
+}
+
+// ForEachNode note that the function fn will be executed in parallel for each node
+func ForEachNode(cfg *config.Config, fn func(node *v1.Node)) {
+	client, err := cfg.Kubernetes.Client()
+	if err != nil {
+		log.Info().Msgf("Failed to create Kubernetes client while trying to find node information. Got error: %s", err)
+		return
+	}
+
+	nodeList, err := client.
+		CoreV1().
+		Nodes().
+		List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		log.Info().Msgf("Failed to find nodes. Got error: %s", err)
+		return
+	}
+
+	var wg sync.WaitGroup
+	for _, node := range nodeList.Items {
+		wg.Add(1)
+
+		nodeForAsyncFunction := node
+		go func(node *v1.Node) {
+			defer wg.Done()
+			fn(node)
+		}(&nodeForAsyncFunction)
+	}
+	wg.Wait()
 }
 
 func AddLogs(cfg *config.Config, path string, namespace string, name string) {
