@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2022 Steadybit GmbH
+
 package platform
 
 import (
@@ -36,6 +39,13 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 			PodNamespace: pod.Namespace,
 			PodName:      pod.Name,
 			Url:          "http://localhost:9090/actuator/env",
+		})
+		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
+			Config:       cfg,
+			OutputPath:   filepath.Join(pathForPod, "configprops.yml"),
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Url:          "http://localhost:9090/actuator/configprops",
 		})
 		k8s.AddPodHttpEndpointOutput(k8s.AddPodHttpEndpointOutputOptions{
 			Config:       cfg,
