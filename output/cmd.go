@@ -45,11 +45,11 @@ func AddCommandOutput(opts AddCommandOutputOptions) {
 func addCommandOutputWithoutLoop(opts AddCommandOutputOptions, outputPath string) {
 	start := time.Now()
 
-	log.Debug().Msgf("Executing: %s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
 	content := fmt.Sprintf("# Executed command: %s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
 	content = fmt.Sprintf("%s\n# Started at: %s", content, time.Now().Format(time.RFC3339))
 
 	cmd := exec.Command(opts.CommandName, opts.CommandArgs...)
+	log.Debug().Msgf("Executing: %s", cmd.String())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)
