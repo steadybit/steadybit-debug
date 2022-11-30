@@ -4,7 +4,9 @@
 package k8s
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/output"
@@ -12,6 +14,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"net/url"
+	"os/exec"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -172,10 +177,44 @@ type AddPodHttpEndpointOutputOptions struct {
 }
 
 func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
+	podUrl, err := url.Parse(options.Url)
+	if err != nil {
+		log.Error().Msgf("Failed to parse URL '%s'", options.Url)
+		return
+	}
+
+	cmd := exec.Command("kubectl", "port-forward", "-n", options.PodNamespace, fmt.Sprintf("pod/%s", options.PodName), fmt.Sprintf(":%s", podUrl.Port()))
+	log.Debug().Msgf("Executing: %s", cmd.String())
+
+	cmdOut, _ := cmd.StdoutPipe()
+	err = cmd.Start()
+	if err != nil {
+		log.Error().Msgf("Failed to port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
+		return
+	}
+
+	defer func() {
+		err = cmd.Process.Kill()
+		if err != nil {
+			log.Error().Msgf("Failed to stop port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
+			return
+		}
+	}()
+
+	var r = regexp.MustCompile("^Forwarding from .+:(\\d+) -> \\d+$")
+	scanner := bufio.NewScanner(cmdOut)
+	for scanner.Scan() {
+		m := r.FindStringSubmatch(scanner.Text())
+		if m != nil {
+			podUrl.Host = fmt.Sprintf("localhost:%s", m[1])
+			break
+		}
+	}
+
 	output.AddCommandOutput(output.AddCommandOutputOptions{
 		Config:                 options.Config,
-		CommandName:            "kubectl",
-		CommandArgs:            []string{"exec", "-n", options.PodNamespace, options.PodName, "--", "curl", "-s", options.Url},
+		CommandName:            "curl",
+		CommandArgs:            []string{"-s", podUrl.String()},
 		OutputPath:             options.OutputPath,
 		Executions:             options.Executions,
 		DelayBetweenExecutions: options.DelayBetweenExecutions,
