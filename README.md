@@ -9,7 +9,9 @@ avoids frequent back and forth between Steadybit and its customers.
 
 ## Prerequisites
 
-- Kubectl needs to be available on the `$PATH` and configured.
+- `kubectl` needs to be available on the `$PATH` and configured with the correct context.
+- `curl` needs to be available on the `$PATH`.
+
 
 ## Installation
 
