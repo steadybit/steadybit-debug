@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 Steadybit GmbH
+// SPDX-FileCopyrightText: 2023 Steadybit GmbH
 
 package main
 
@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/agent"
 	"github.com/steadybit/steadybit-debug/config"
+	"github.com/steadybit/steadybit-debug/extensions"
 	"github.com/steadybit/steadybit-debug/k8s"
 	"github.com/steadybit/steadybit-debug/output"
 	"github.com/steadybit/steadybit-debug/platform"
@@ -40,7 +41,7 @@ func main() {
 
 func gatherInformation(cfg *config.Config) {
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
@@ -55,6 +56,11 @@ func gatherInformation(cfg *config.Config) {
 	go func() {
 		defer wg.Done()
 		k8s.AddKubernetesNodesInformation(cfg)
+	}()
+
+	go func() {
+		defer wg.Done()
+		extensions.AddExtentionsDebuggingInformation(cfg)
 	}()
 
 	wg.Wait()

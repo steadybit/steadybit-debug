@@ -17,6 +17,7 @@ type Config struct {
 	Kubernetes KubernetesConfig `yaml:"kubernetes"`
 	Platform   PlatformConfig   `yaml:"platform"`
 	Agent      AgentConfig      `yaml:"agent"`
+	Extensions ExtensionsConfig `yaml:"extensions"`
 }
 
 type PlatformConfig struct {
@@ -27,6 +28,10 @@ type PlatformConfig struct {
 type AgentConfig struct {
 	DaemonSet string `yaml:"daemonSet" long:"agent-daemon-set" description:"Kubernetes daemon set name of the Steadybit agent"`
 	Namespace string `yaml:"namespace" long:"agent-namespace" description:"Kubernetes namespace name of the Steadybit agent"`
+}
+
+type ExtensionsConfig struct {
+	Namespaces []string `yaml:"namespaces" long:"extensions-namespaces" description:"Kubernetes namespaces of the Steadybit extensions"`
 }
 
 type KubernetesConfig struct {
@@ -67,6 +72,9 @@ func newConfig() Config {
 		Agent: AgentConfig{
 			Namespace: "steadybit-agent",
 			DaemonSet: "steadybit-agent",
+		},
+		Extensions: ExtensionsConfig{
+			Namespaces: []string{"steadybit-extension"},
 		},
 	}
 }

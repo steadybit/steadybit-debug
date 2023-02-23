@@ -45,6 +45,28 @@ func FindDaemonSet(cfg *config.Config, namespace string, name string) (*appsv1.D
 		Get(context.Background(), name, metav1.GetOptions{})
 }
 
+func FindExtensionsServices(cfg *config.Config, namespace string) ([]*v1.Service, error) {
+	client, err := cfg.Kubernetes.Client()
+	if err != nil {
+		return nil, err
+	}
+
+	//stuff, w := client.CoreV1().Services(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	listOfServices, err := client.CoreV1().Services(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*v1.Service, 0)
+	for _, service := range listOfServices.Items {
+		_, ok := service.Annotations["steadybit.com/extension-auto-discovery"]
+		if ok {
+			result = append(result, &service)
+		}
+	}
+	return result, nil
+}
+
 func AddDescription(config *config.Config, outputPath string, kind string, namespace string, name string) {
 	output.AddCommandOutput(output.AddCommandOutputOptions{
 		Config:      config,
@@ -71,6 +93,21 @@ func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSele
 		return
 	}
 
+	doWithPods(podList, fn)
+}
+
+// ForEachPodViaMapSelector note that the function fn will be executed in parallel for each pod
+func ForEachPodViaMapSelector(cfg *config.Config, namespace string, selectorMap map[string]string, fn func(pod *v1.Pod)) {
+	podList, err := findPodsBySelectorMap(cfg, namespace, selectorMap)
+	if err != nil {
+		log.Info().Msgf("Failed to find pods in namespace '%s' for selector '%s'. Got error: %s", namespace, selectorMap, err)
+		return
+	}
+
+	doWithPods(podList, fn)
+}
+
+func doWithPods(podList *v1.PodList, fn func(pod *v1.Pod)) {
 	var wg sync.WaitGroup
 	for _, pod := range podList.Items {
 		wg.Add(1)
@@ -87,12 +124,16 @@ func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSele
 func findPods(cfg *config.Config,
 	namespace string,
 	selector *metav1.LabelSelector) (*v1.PodList, error) {
-	client, err := cfg.Kubernetes.Client()
+	selectorMap, err := metav1.LabelSelectorAsMap(selector)
 	if err != nil {
 		return nil, err
 	}
 
-	selectorMap, err := metav1.LabelSelectorAsMap(selector)
+	return findPodsBySelectorMap(cfg, namespace, selectorMap)
+}
+
+func findPodsBySelectorMap(cfg *config.Config, namespace string, selectorMap map[string]string) (*v1.PodList, error) {
+	client, err := cfg.Kubernetes.Client()
 	if err != nil {
 		return nil, err
 	}
