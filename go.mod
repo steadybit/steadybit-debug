@@ -5,6 +5,9 @@ go 1.18
 require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/rs/zerolog v1.27.0
+	github.com/steadybit/action-kit/go/action_kit_api/v2 v2.2.0
+	github.com/steadybit/discovery-kit/go/discovery_kit_api v1.1.0
+	github.com/steadybit/event-kit/go/event_kit_api v1.1.0
 	k8s.io/api v0.24.3
 	k8s.io/apimachinery v0.24.3
 	k8s.io/client-go v0.24.3
@@ -23,6 +26,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
