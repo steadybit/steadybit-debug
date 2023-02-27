@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 type TraverseExtensionEndpointsOptions struct {
@@ -114,17 +115,23 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 		urlsToCurlSlice = append(urlsToCurlSlice, urlsToCurl{Method: string(eventListener.Method), Path: eventListener.Path})
 	}
 
+	var wg sync.WaitGroup
 	for _, urlToCurl := range urlsToCurlSlice {
 		filename := strings.ReplaceAll(urlToCurl.Path, "/", "_")
 		outputPath := fmt.Sprintf("%s/%s.yml", options.PathForPod, filename)
 		fullUrl := podUrl.JoinPath(urlToCurl.Path)
-		output.AddCommandOutput(output.AddCommandOutputOptions{
-			Config:      options.Config,
-			CommandName: "curl",
-			CommandArgs: []string{"-s", fullUrl.String(), "-X", strings.ToUpper(urlToCurl.Method)},
-			OutputPath:  outputPath,
-		})
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			output.AddCommandOutput(output.AddCommandOutputOptions{
+				Config:      options.Config,
+				CommandName: "curl",
+				CommandArgs: []string{"-s", fullUrl.String(), "-X", strings.ToUpper(urlToCurl.Method)},
+				OutputPath:  outputPath,
+			})
+		}()
 	}
+	wg.Wait()
 }
 
 func findDiscoveredTargetsUrl(method discovery_kit_api.DescribingEndpointReferenceMethod, path string, podUrl *url.URL, urlsToCurlSlicePtr *[]urlsToCurl) {

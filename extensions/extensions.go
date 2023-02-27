@@ -13,46 +13,53 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const ExtensionAutoDiscoveryAnnotation = "steadybit.com/extension-auto-discovery"
 
 func AddExtentionsDebuggingInformation(cfg *config.Config) {
+	var wg sync.WaitGroup
 	for _, namespace := range cfg.Extensions.Namespaces {
-		services, err := k8s.FindExtensionsServices(cfg, namespace)
-		if err != nil {
-			log.Warn().Msgf("Failed to find services set '%s': %s", cfg.Extensions.Namespaces, err)
-			return
-		}
+		wg.Add(1)
+		go func(namespace string) {
+			defer wg.Done()
+			services, err := k8s.FindExtensionsServices(cfg, namespace)
+			if err != nil {
+				log.Warn().Msgf("Failed to find services set '%s': %s", cfg.Extensions.Namespaces, err)
+				return
+			}
 
-		for _, service := range services {
-			pathForExtension := filepath.Join(cfg.OutputPath, "extensions", service.Name)
-			k8s.AddDescription(cfg, filepath.Join(pathForExtension, "description.txt"), "service", service.Namespace, service.Name)
-			k8s.AddConfig(cfg, filepath.Join(pathForExtension, "config.yaml"), "service", service.Namespace, service.Name)
+			for _, service := range services {
+				pathForExtension := filepath.Join(cfg.OutputPath, "extensions", service.Name)
+				k8s.AddDescription(cfg, filepath.Join(pathForExtension, "description.txt"), "service", service.Namespace, service.Name)
+				k8s.AddConfig(cfg, filepath.Join(pathForExtension, "config.yaml"), "service", service.Namespace, service.Name)
 
-			k8s.ForEachPodViaMapSelector(cfg, service.Namespace, service.Spec.Selector, func(pod *v1.Pod) {
-				pathForPod := filepath.Join(pathForExtension, "pods", pod.Name)
+				k8s.ForEachPodViaMapSelector(cfg, service.Namespace, service.Spec.Selector, func(pod *v1.Pod) {
+					pathForPod := filepath.Join(pathForExtension, "pods", pod.Name)
 
-				k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
-				k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
-				k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
-				k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
-				k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
+					k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
+					k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
+					k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
+					k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
+					k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
 
-				ports := identifyPodPorts(pod, service)
-				for _, port := range ports {
-					TraverseExtensionEndpoints(TraverseExtensionEndpointsOptions{
-						Config:       cfg,
-						PodNamespace: pod.Namespace,
-						PodName:      pod.Name,
-						PathForPod:   filepath.Join(pathForPod, "http"),
-						BaseUrl:      fmt.Sprintf("http://localhost:%d/", port),
-					})
-				}
-			})
-		}
+					ports := identifyPodPorts(pod, service)
+					for _, port := range ports {
+						TraverseExtensionEndpoints(TraverseExtensionEndpointsOptions{
+							Config:       cfg,
+							PodNamespace: pod.Namespace,
+							PodName:      pod.Name,
+							PathForPod:   filepath.Join(pathForPod, "http"),
+							BaseUrl:      fmt.Sprintf("http://localhost:%d/", port),
+						})
+					}
+				})
+			}
+		}(namespace)
+
 	}
-
+	wg.Wait()
 }
 
 type extensionAutoDiscoveryExtension struct {
