@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -207,6 +208,24 @@ func AddResourceUsage(cfg *config.Config, path string, namespace string, name st
 	})
 }
 
+type EndpointsOutputOptions struct {
+	OutputPath             string
+	Url                    string
+	Executions             int
+	DelayBetweenExecutions *time.Duration
+}
+
+type PodConfig struct {
+	PodNamespace string
+	PodName      string
+	Config       *config.Config
+}
+type AddPodHttpEndpointsOutputOptions struct {
+	SharedPort      int
+	PodConfig       PodConfig
+	EndpointOptions []EndpointsOutputOptions
+}
+
 type AddPodHttpEndpointOutputOptions struct {
 	Config                 *config.Config
 	OutputPath             string
@@ -217,40 +236,72 @@ type AddPodHttpEndpointOutputOptions struct {
 	DelayBetweenExecutions *time.Duration
 }
 
+func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) {
+	forwardingHostWithPort, cmd, err := preparePortforwarding(PodConfig{
+		PodNamespace: options.PodConfig.PodNamespace,
+		PodName:      options.PodConfig.PodName,
+		Config:       options.PodConfig.Config,
+	}, options.SharedPort)
+	if err != nil {
+		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
+		return
+	}
+
+	defer func() {
+		killProcess(cmd, options.PodConfig)
+	}()
+
+	var wg sync.WaitGroup
+	for _, endpoint := range options.EndpointOptions {
+		wg.Add(1)
+		go func(endpoint EndpointsOutputOptions) {
+			defer wg.Done()
+			podUrl, err := url.Parse(endpoint.Url)
+			if err != nil {
+				log.Error().Msgf("Failed to parse URL '%s'", endpoint.Url)
+				return
+			}
+			podUrl.Host = forwardingHostWithPort
+
+			output.AddCommandOutput(output.AddCommandOutputOptions{
+				Config:                 options.PodConfig.Config,
+				OutputPath:             endpoint.OutputPath,
+				Executions:             endpoint.Executions,
+				DelayBetweenExecutions: endpoint.DelayBetweenExecutions,
+				CommandName:            "curl",
+				CommandArgs:            []string{"-s", podUrl.String()},
+			})
+		}(endpoint)
+	}
+	wg.Wait()
+
+}
 func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 	podUrl, err := url.Parse(options.Url)
 	if err != nil {
 		log.Error().Msgf("Failed to parse URL '%s'", options.Url)
 		return
 	}
-
-	cmd := exec.Command("kubectl", "port-forward", "-n", options.PodNamespace, fmt.Sprintf("pod/%s", options.PodName), fmt.Sprintf(":%s", podUrl.Port()))
-	log.Debug().Msgf("Executing: %s", cmd.String())
-
-	cmdOut, _ := cmd.StdoutPipe()
-	err = cmd.Start()
+	port, _ := strconv.Atoi(podUrl.Port())
+	host, cmd, err := preparePortforwarding(PodConfig{
+		PodNamespace: options.PodNamespace,
+		PodName:      options.PodName,
+		Config:       options.Config,
+	}, port)
 	if err != nil {
-		log.Error().Msgf("Failed to port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
+		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
 		return
 	}
 
 	defer func() {
-		err = cmd.Process.Kill()
-		if err != nil {
-			log.Error().Msgf("Failed to stop port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
-			return
-		}
+		killProcess(cmd, PodConfig{
+			PodNamespace: options.PodNamespace,
+			PodName:      options.PodName,
+			Config:       options.Config,
+		})
 	}()
 
-	var r = regexp.MustCompile("^Forwarding from .+:(\\d+) -> \\d+$")
-	scanner := bufio.NewScanner(cmdOut)
-	for scanner.Scan() {
-		m := r.FindStringSubmatch(scanner.Text())
-		if m != nil {
-			podUrl.Host = fmt.Sprintf("localhost:%s", m[1])
-			break
-		}
-	}
+	podUrl.Host = host
 
 	output.AddCommandOutput(output.AddCommandOutputOptions{
 		Config:                 options.Config,
@@ -260,4 +311,36 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 		Executions:             options.Executions,
 		DelayBetweenExecutions: options.DelayBetweenExecutions,
 	})
+}
+
+func killProcess(cmd *exec.Cmd, options PodConfig) {
+	err := cmd.Process.Kill()
+	if err != nil {
+		log.Error().Msgf("Failed to stop port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
+		return
+	}
+}
+
+func preparePortforwarding(options PodConfig, port int) (string, *exec.Cmd, error) {
+	cmd := exec.Command("kubectl", "port-forward", "-n", options.PodNamespace, fmt.Sprintf("pod/%s", options.PodName), fmt.Sprintf(":%d", port))
+	log.Debug().Msgf("Executing: %s", cmd.String())
+
+	cmdOut, _ := cmd.StdoutPipe()
+	err := cmd.Start()
+	if err != nil {
+		log.Error().Msgf("Failed to port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
+		return "", nil, err
+	}
+
+	var result string
+	var r = regexp.MustCompile("^Forwarding from .+:(\\d+) -> \\d+$")
+	scanner := bufio.NewScanner(cmdOut)
+	for scanner.Scan() {
+		m := r.FindStringSubmatch(scanner.Text())
+		if m != nil {
+			result = fmt.Sprintf("localhost:%s", m[1])
+			break
+		}
+	}
+	return result, cmd, nil
 }
