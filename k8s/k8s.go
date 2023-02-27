@@ -237,7 +237,7 @@ type AddPodHttpEndpointOutputOptions struct {
 }
 
 func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) {
-	forwardingHostWithPort, cmd, err := preparePortforwarding(PodConfig{
+	forwardingHostWithPort, cmd, err := PreparePortforwarding(PodConfig{
 		PodNamespace: options.PodConfig.PodNamespace,
 		PodName:      options.PodConfig.PodName,
 		Config:       options.PodConfig.Config,
@@ -248,7 +248,7 @@ func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) 
 	}
 
 	defer func() {
-		killProcess(cmd, options.PodConfig)
+		KillProcess(cmd, options.PodConfig)
 	}()
 
 	var wg sync.WaitGroup
@@ -283,7 +283,7 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 		return
 	}
 	port, _ := strconv.Atoi(podUrl.Port())
-	host, cmd, err := preparePortforwarding(PodConfig{
+	host, cmd, err := PreparePortforwarding(PodConfig{
 		PodNamespace: options.PodNamespace,
 		PodName:      options.PodName,
 		Config:       options.Config,
@@ -294,7 +294,7 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 	}
 
 	defer func() {
-		killProcess(cmd, PodConfig{
+		KillProcess(cmd, PodConfig{
 			PodNamespace: options.PodNamespace,
 			PodName:      options.PodName,
 			Config:       options.Config,
@@ -313,7 +313,7 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 	})
 }
 
-func killProcess(cmd *exec.Cmd, options PodConfig) {
+func KillProcess(cmd *exec.Cmd, options PodConfig) {
 	err := cmd.Process.Kill()
 	if err != nil {
 		log.Error().Msgf("Failed to stop port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
@@ -321,7 +321,7 @@ func killProcess(cmd *exec.Cmd, options PodConfig) {
 	}
 }
 
-func preparePortforwarding(options PodConfig, port int) (string, *exec.Cmd, error) {
+func PreparePortforwarding(options PodConfig, port int) (string, *exec.Cmd, error) {
 	cmd := exec.Command("kubectl", "port-forward", "-n", options.PodNamespace, fmt.Sprintf("pod/%s", options.PodName), fmt.Sprintf(":%d", port))
 	log.Debug().Msgf("Executing: %s", cmd.String())
 

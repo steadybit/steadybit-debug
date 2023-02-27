@@ -5,7 +5,6 @@
 package extensions
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/rs/zerolog/log"
@@ -13,12 +12,11 @@ import (
 	"github.com/steadybit/discovery-kit/go/discovery_kit_api"
 	"github.com/steadybit/event-kit/go/event_kit_api"
 	"github.com/steadybit/steadybit-debug/config"
+	"github.com/steadybit/steadybit-debug/k8s"
 	"github.com/steadybit/steadybit-debug/output"
 	"io"
 	"net/http"
 	"net/url"
-	"os/exec"
-	"regexp"
 	"strings"
 	"sync"
 )
@@ -27,7 +25,7 @@ type TraverseExtensionEndpointsOptions struct {
 	Config       *config.Config
 	PodNamespace string
 	PodName      string
-	BaseUrl      string
+	Port         int
 	PathForPod   string
 }
 
@@ -43,40 +41,31 @@ type extensionListResponse struct {
 }
 
 func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
-	podUrl, err := url.Parse(options.BaseUrl)
+	baseUrl := fmt.Sprintf("http://localhost:%d/", options.Port)
+	podUrl, err := url.Parse(baseUrl)
 	if err != nil {
-		log.Error().Msgf("Failed to parse URL '%s'", options.BaseUrl)
+		log.Error().Msgf("Failed to parse URL '%s'", baseUrl)
 		return
 	}
-
-	cmd := exec.Command("kubectl", "port-forward", "-n", options.PodNamespace, fmt.Sprintf("pod/%s", options.PodName), fmt.Sprintf(":%s", podUrl.Port()))
-	log.Debug().Msgf("Executing: %s", cmd.String())
-
-	cmdOut, _ := cmd.StdoutPipe()
-	err = cmd.Start()
+	forwardingHostWithPort, cmd, err := k8s.PreparePortforwarding(k8s.PodConfig{
+		PodNamespace: options.PodNamespace,
+		PodName:      options.PodName,
+		Config:       options.Config,
+	}, options.Port)
 	if err != nil {
-		log.Error().Msgf("Failed to port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
+		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
 		return
 	}
 
 	defer func() {
-		err = cmd.Process.Kill()
-		if err != nil {
-			log.Error().Msgf("Failed to stop port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
-			return
-		}
+		k8s.KillProcess(cmd, k8s.PodConfig{
+			PodNamespace: options.PodNamespace,
+			PodName:      options.PodName,
+			Config:       options.Config,
+		})
 	}()
 
-	var r = regexp.MustCompile("^Forwarding from .+:(\\d+) -> \\d+$")
-	scanner := bufio.NewScanner(cmdOut)
-	for scanner.Scan() {
-		m := r.FindStringSubmatch(scanner.Text())
-		if m != nil {
-			podUrl.Host = fmt.Sprintf("localhost:%s", m[1])
-			break
-		}
-	}
-
+	podUrl.Host = forwardingHostWithPort
 	response, err := http.Get(podUrl.String())
 	if err != nil {
 		log.Error().Msgf("Failed to get '%s'", podUrl.String())

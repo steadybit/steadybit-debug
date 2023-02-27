@@ -5,7 +5,6 @@ package extensions
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/k8s"
@@ -51,7 +50,7 @@ func AddExtentionsDebuggingInformation(cfg *config.Config) {
 							PodNamespace: pod.Namespace,
 							PodName:      pod.Name,
 							PathForPod:   filepath.Join(pathForPod, "http"),
-							BaseUrl:      fmt.Sprintf("http://localhost:%d/", port),
+							Port:         port,
 						})
 					}
 				})
