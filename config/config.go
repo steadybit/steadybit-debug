@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2023 Steadybit GmbH
+
 package config
 
 import (
@@ -31,6 +34,7 @@ type AgentConfig struct {
 }
 
 type ExtensionsConfig struct {
+	// TODO search across all namespaces and thus remove this config
 	Namespaces []string `yaml:"namespaces" long:"extensions-namespaces" description:"Kubernetes namespaces of the Steadybit extensions"`
 }
 

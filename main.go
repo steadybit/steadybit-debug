@@ -60,7 +60,7 @@ func gatherInformation(cfg *config.Config) {
 
 	go func() {
 		defer wg.Done()
-		extensions.AddExtentionsDebuggingInformation(cfg)
+		extensions.AddExtensionDebuggingInformation(cfg)
 	}()
 
 	wg.Wait()

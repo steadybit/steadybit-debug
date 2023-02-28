@@ -17,10 +17,11 @@ import (
 
 const ExtensionAutoDiscoveryAnnotation = "steadybit.com/extension-auto-discovery"
 
-func AddExtentionsDebuggingInformation(cfg *config.Config) {
+func AddExtensionDebuggingInformation(cfg *config.Config) {
 	var wg sync.WaitGroup
 	for _, namespace := range cfg.Extensions.Namespaces {
 		wg.Add(1)
+		// TODO extract this inline function as it is pretty long?
 		go func(namespace string) {
 			defer wg.Done()
 			services, err := k8s.FindExtensionsServices(cfg, namespace)
@@ -30,10 +31,12 @@ func AddExtentionsDebuggingInformation(cfg *config.Config) {
 			}
 
 			for _, service := range services {
-				pathForExtension := filepath.Join(cfg.OutputPath, "extensions", service.Name)
+				pathForExtension := filepath.Join(cfg.OutputPath, "extensions", service.Namespace, service.Name)
 				k8s.AddDescription(cfg, filepath.Join(pathForExtension, "description.txt"), "service", service.Namespace, service.Name)
 				k8s.AddConfig(cfg, filepath.Join(pathForExtension, "config.yaml"), "service", service.Namespace, service.Name)
 
+				// TODO something is wrong with the looping. The data for the same extension was collected six times?
+				// TODO Try awsdev -> kubectx dev-demo -> go run .
 				k8s.ForEachPodViaMapSelector(cfg, service.Namespace, service.Spec.Selector, func(pod *v1.Pod) {
 					pathForPod := filepath.Join(pathForExtension, "pods", pod.Name)
 
@@ -82,6 +85,7 @@ func identifyPodPorts(pod *v1.Pod, service *v1.Service) []int {
 		}
 		ret := make([]int, 0, len(extensionAutoDiscoveryStruct.Extensions))
 		for _, extension := range extensionAutoDiscoveryStruct.Extensions {
+			// TODO this looks like temporary debugging output that customers might not need. Remove the line?
 			log.Debug().Msgf("Found extension port: %d", extension.Port)
 			ret = append(ret, extension.Port)
 		}
