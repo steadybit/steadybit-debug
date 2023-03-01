@@ -14,8 +14,6 @@ import (
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/k8s"
 	"github.com/steadybit/steadybit-debug/output"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -81,8 +79,7 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 	}
 
 	extensionListResponse := extensionListResponse{}
-	//body, err := io.ReadAll(response.Body)
-	fmt.Println(string(body))
+
 	if err := json.Unmarshal(body, &extensionListResponse); err != nil {
 		log.Err(err).Msgf("Failed to parse response body: %s", string(body))
 	}
@@ -96,7 +93,7 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 
 	for _, discovery := range extensionListResponse.Discoveries {
 		urlsToCurlSlice = append(urlsToCurlSlice, urlsToCurl{Method: string(discovery.Method), Path: discovery.Path})
-		findDiscoveredTargetsUrl(discovery.Method, discovery.Path, podUrl, &urlsToCurlSlice)
+		findDiscoveredTargetsUrl(options.Config, discovery.Method, discovery.Path, podUrl, options.UseHttps, &urlsToCurlSlice)
 	}
 
 	for _, targetAttribute := range extensionListResponse.TargetAttributes {
@@ -133,17 +130,15 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 	wg.Wait()
 }
 
-func findDiscoveredTargetsUrl(method discovery_kit_api.DescribingEndpointReferenceMethod, path string, podUrl *url.URL, urlsToCurlSlicePtr *[]urlsToCurl) {
+func findDiscoveredTargetsUrl(cfg *config.Config, method discovery_kit_api.DescribingEndpointReferenceMethod, path string, podUrl *url.URL, useHttps bool, urlsToCurlSlicePtr *[]urlsToCurl) {
 	fullUrl := podUrl.JoinPath(path)
-	response, err := doHttpRequest(fullUrl, string(method))
-	if err != nil {
-		log.Error().Msgf("Failed to get '%s'", fullUrl.String())
-		return
-	}
-
-	defer closeResponse(response)
-
-	body, err := io.ReadAll(response.Body)
+	body, err := output.DoHttp(output.HttpOptions{
+		Config:     cfg,
+		Method:     string(method),
+		URL:        *fullUrl,
+		UseHttps:   useHttps,
+		FormatJson: false,
+	})
 	if err != nil {
 		log.Error().Msgf("Failed to read response body")
 		return
@@ -155,23 +150,4 @@ func findDiscoveredTargetsUrl(method discovery_kit_api.DescribingEndpointReferen
 	}
 
 	*urlsToCurlSlicePtr = append(*urlsToCurlSlicePtr, urlsToCurl{Method: string(discoveryDescriptionResponse.Discover.Method), Path: discoveryDescriptionResponse.Discover.Path})
-}
-
-func closeResponse(response *http.Response) {
-	func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Error().Msgf("Failed to close response body")
-			return
-		}
-	}(response.Body)
-}
-
-func doHttpRequest(url *url.URL, method string) (*http.Response, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest(strings.ToUpper(method), url.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	return client.Do(req)
 }

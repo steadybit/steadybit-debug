@@ -46,9 +46,6 @@ func findDebugInformationInNamespace(namespace string, cfg *config.Config) {
 
 	var wg sync.WaitGroup
 	for _, service := range services {
-		//if !strings.Contains(service.Name, "aws") {
-		//	continue
-		//}
 		wg.Add(1)
 		go func(service v1.Service) {
 			defer wg.Done()

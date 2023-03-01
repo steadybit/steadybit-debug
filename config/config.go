@@ -20,6 +20,7 @@ type Config struct {
 	Kubernetes KubernetesConfig `yaml:"kubernetes"`
 	Platform   PlatformConfig   `yaml:"platform"`
 	Agent      AgentConfig      `yaml:"agent"`
+	Tls        Tls              `yaml:"tls"`
 }
 
 type PlatformConfig struct {
@@ -30,6 +31,11 @@ type PlatformConfig struct {
 type AgentConfig struct {
 	DaemonSet string `yaml:"daemonSet" long:"agent-daemon-set" description:"Kubernetes daemon set name of the Steadybit agent"`
 	Namespace string `yaml:"namespace" long:"agent-namespace" description:"Kubernetes namespace name of the Steadybit agent"`
+}
+
+type Tls struct {
+	CertChainFile string `yaml:"certChainFile" long:"cert-chain-file" description:"Path to the certificate chain file"`
+	CertKeyFile   string `yaml:"certKeyFile" long:"cert-key-file" description:"Path to the certificate key file"`
 }
 
 type KubernetesConfig struct {
@@ -70,6 +76,10 @@ func newConfig() Config {
 		Agent: AgentConfig{
 			Namespace: "steadybit-agent",
 			DaemonSet: "steadybit-agent",
+		},
+		Tls: Tls{
+			CertChainFile: "",
+			CertKeyFile:   "",
 		},
 	}
 }

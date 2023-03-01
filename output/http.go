@@ -7,6 +7,7 @@ package output
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"github.com/rs/zerolog/log"
@@ -14,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -100,12 +102,34 @@ func doHttp(options HttpOptions) ([]byte, error) {
 	var tr *http.Transport
 	if options.UseHttps {
 		tr = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
 		}
 		options.URL.Scheme = "https"
+		if options.Config.Tls.CertChainFile != "" && options.Config.Tls.CertKeyFile != "" {
+			cert, err := os.ReadFile(options.Config.Tls.CertChainFile)
+			if err != nil {
+				log.Err(err).Msgf("Failed to read certificate")
+			}
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(cert)
+
+			certificate, err := tls.LoadX509KeyPair(options.Config.Tls.CertChainFile, options.Config.Tls.CertKeyFile)
+			if err != nil {
+				log.Err(err).Msgf("Failed to load certificate")
+				return nil, err
+			}
+			tr.TLSClientConfig = &tls.Config{
+				RootCAs:            caCertPool,
+				Certificates:       []tls.Certificate{certificate},
+				InsecureSkipVerify: true,
+			}
+		}
 	} else {
 		tr = &http.Transport{}
 	}
+
 	client := &http.Client{Transport: tr}
 	var req = &http.Request{
 		Method: options.Method,
@@ -114,6 +138,7 @@ func doHttp(options HttpOptions) ([]byte, error) {
 	response, err := client.Do(req)
 	defer closeResponse(response)
 	if err != nil {
+		log.Err(err).Msgf("Failed to execute request")
 		return nil, err
 	}
 	if response.StatusCode != http.StatusOK {
@@ -127,6 +152,9 @@ func doHttp(options HttpOptions) ([]byte, error) {
 }
 
 func closeResponse(response *http.Response) {
+	if response == nil {
+		return
+	}
 	func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
