@@ -27,6 +27,7 @@ type TraverseExtensionEndpointsOptions struct {
 	PodName      string
 	Port         int
 	PathForPod   string
+	UseHttps     bool
 }
 
 type urlsToCurl struct {
@@ -42,6 +43,7 @@ type extensionListResponse struct {
 
 func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 	baseUrl := fmt.Sprintf("http://localhost:%d/", options.Port)
+
 	podUrl, err := url.Parse(baseUrl)
 	if err != nil {
 		log.Error().Msgf("Failed to parse URL '%s'", baseUrl)
@@ -66,16 +68,21 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 	}()
 
 	podUrl.Host = forwardingHostWithPort
-	response, err := http.Get(podUrl.String())
+	body, err := output.DoHttp(output.HttpOptions{
+		Config:     options.Config,
+		Method:     "GET",
+		URL:        *podUrl,
+		UseHttps:   options.UseHttps,
+		FormatJson: false,
+	})
 	if err != nil {
 		log.Error().Msgf("Failed to get '%s'", podUrl.String())
 		return
 	}
 
-	defer closeResponse(response)
-
 	extensionListResponse := extensionListResponse{}
-	body, err := io.ReadAll(response.Body)
+	//body, err := io.ReadAll(response.Body)
+	fmt.Println(string(body))
 	if err := json.Unmarshal(body, &extensionListResponse); err != nil {
 		log.Err(err).Msgf("Failed to parse response body: %s", string(body))
 	}
@@ -110,13 +117,16 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 		outputPath := fmt.Sprintf("%s/%s.yml", options.PathForPod, filename)
 		fullUrl := podUrl.JoinPath(urlToCurl.Path)
 		wg.Add(1)
+		urlToCurl := urlToCurl
 		go func() {
 			defer wg.Done()
-			output.AddCommandOutput(output.AddCommandOutputOptions{
-				Config:      options.Config,
-				CommandName: "curl",
-				CommandArgs: []string{"-s", fullUrl.String(), "-X", strings.ToUpper(urlToCurl.Method)},
-				OutputPath:  outputPath,
+			output.AddHttpOutput(output.AddHttpOutputOptions{
+				Config:     options.Config,
+				URL:        *fullUrl,
+				Method:     urlToCurl.Method,
+				OutputPath: outputPath,
+				FormatJson: true,
+				UseHttps:   options.UseHttps,
 			})
 		}()
 	}

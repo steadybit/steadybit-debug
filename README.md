@@ -55,10 +55,6 @@ platform:
   deployment: platform
 agent:
   namespace: chaos-eng
-extensions:
-  namespaces: 
-   - steadybit-extension
-   - chaos-ext 
 ```
 
 To learn more about all the available configuration options please inspect

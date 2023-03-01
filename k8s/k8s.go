@@ -46,32 +46,6 @@ func FindDaemonSet(cfg *config.Config, namespace string, name string) (*appsv1.D
 		Get(context.Background(), name, metav1.GetOptions{})
 }
 
-// TODO Why do we need this as a global utility?
-func FindExtensionsServices(cfg *config.Config, namespace string) ([]*v1.Service, error) {
-	client, err := cfg.Kubernetes.Client()
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO can this be removed?
-	//stuff, w := client.CoreV1().Services(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	// TODO search across all namespaces
-	listOfServices, err := client.CoreV1().Services(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO always to correct presize the created slice
-	result := make([]*v1.Service, 0)
-	for _, service := range listOfServices.Items {
-		_, ok := service.Annotations["steadybit.com/extension-auto-discovery"]
-		if ok {
-			result = append(result, &service)
-		}
-	}
-	return result, nil
-}
-
 func AddDescription(config *config.Config, outputPath string, kind string, namespace string, name string) {
 	output.AddCommandOutput(output.AddCommandOutputOptions{
 		Config:      config,
