@@ -65,7 +65,7 @@ func AddConfig(config *config.Config, outputPath string, kind string, namespace 
 }
 
 // ForEachPod note that the function fn will be executed in parallel for each pod
-func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSelector, fn func(pod *v1.Pod)) {
+func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSelector, fn func(pod *v1.Pod, idx int)) {
 	podList, err := findPods(cfg, namespace, selector)
 	if err != nil {
 		log.Info().Msgf("Failed to find pods in namespace '%s' for selector '%s'. Got error: %s", namespace, selector.String(), err)
@@ -76,7 +76,7 @@ func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSele
 }
 
 // ForEachPodViaMapSelector note that the function fn will be executed in parallel for each pod
-func ForEachPodViaMapSelector(cfg *config.Config, namespace string, selectorMap map[string]string, fn func(pod *v1.Pod)) {
+func ForEachPodViaMapSelector(cfg *config.Config, namespace string, selectorMap map[string]string, fn func(pod *v1.Pod, idx int)) {
 	podList, err := findPodsBySelectorMap(cfg, namespace, selectorMap)
 	if err != nil {
 		log.Info().Msgf("Failed to find pods in namespace '%s' for selector '%s'. Got error: %s", namespace, selectorMap, err)
@@ -86,15 +86,16 @@ func ForEachPodViaMapSelector(cfg *config.Config, namespace string, selectorMap 
 	doWithPods(podList, fn)
 }
 
-func doWithPods(podList *v1.PodList, fn func(pod *v1.Pod)) {
+func doWithPods(podList *v1.PodList, fn func(pod *v1.Pod, idx int)) {
 	var wg sync.WaitGroup
-	for _, pod := range podList.Items {
+	for idx, pod := range podList.Items {
 		wg.Add(1)
 
 		podForAsyncFunction := pod
+		idx := idx
 		go func(pod *v1.Pod) {
 			defer wg.Done()
-			fn(pod)
+			fn(pod, idx)
 		}(&podForAsyncFunction)
 	}
 	wg.Wait()
@@ -214,6 +215,15 @@ type AddPodHttpEndpointOutputOptions struct {
 	DelayBetweenExecutions *time.Duration
 }
 
+type AddDownloadOutputOptions struct {
+	Config       *config.Config
+	OutputPath   string
+	PodNamespace string
+	PodName      string
+	Url          string
+	Method       string
+}
+
 func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) {
 	forwardingHostWithPort, cmd, err := PreparePortforwarding(PodConfig{
 		PodNamespace: options.PodConfig.PodNamespace,
@@ -288,6 +298,40 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 		OutputPath:             options.OutputPath,
 		Executions:             options.Executions,
 		DelayBetweenExecutions: options.DelayBetweenExecutions,
+	})
+}
+
+func DownloadFromPod(options AddDownloadOutputOptions) {
+	downloadUrl, err := url.Parse(options.Url)
+	if err != nil {
+		log.Error().Msgf("Failed to parse URL '%s'", options.Url)
+		return
+	}
+	port, _ := strconv.Atoi(downloadUrl.Port())
+	forwardingHostWithPort, cmd, err := PreparePortforwarding(PodConfig{
+		PodNamespace: options.PodNamespace,
+		PodName:      options.PodName,
+		Config:       options.Config,
+	}, port)
+	if err != nil {
+		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
+		return
+	}
+
+	defer func() {
+		KillProcess(cmd, PodConfig{
+			PodNamespace: options.PodNamespace,
+			PodName:      options.PodName,
+			Config:       options.Config,
+		})
+	}()
+
+	downloadUrl.Host = forwardingHostWithPort
+	output.DownloadOutput(output.DownloadOptions{
+		Config:     options.Config,
+		OutputPath: options.OutputPath,
+		Method:     options.Method,
+		URL:        *downloadUrl,
 	})
 }
 

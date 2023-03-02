@@ -54,7 +54,7 @@ func findDebugInformationInNamespace(namespace string, cfg *config.Config) {
 			k8s.AddDescription(cfg, filepath.Join(pathForExtension, "description.txt"), "service", service.Namespace, service.Name)
 			k8s.AddConfig(cfg, filepath.Join(pathForExtension, "config.yaml"), "service", service.Namespace, service.Name)
 
-			k8s.ForEachPodViaMapSelector(cfg, service.Namespace, service.Spec.Selector, func(pod *v1.Pod) {
+			k8s.ForEachPodViaMapSelector(cfg, service.Namespace, service.Spec.Selector, func(pod *v1.Pod, _ int) {
 				pathForPod := filepath.Join(pathForExtension, "pods", pod.Name)
 
 				k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)

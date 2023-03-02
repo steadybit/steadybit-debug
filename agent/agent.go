@@ -26,7 +26,7 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 	k8s.AddDescription(cfg, filepath.Join(pathForAgent, "description.txt"), "daemonset", daemonSet.Namespace, daemonSet.Name)
 	k8s.AddConfig(cfg, filepath.Join(pathForAgent, "config.yaml"), "daemonset", daemonSet.Namespace, daemonSet.Name)
 
-	k8s.ForEachPod(cfg, daemonSet.Namespace, daemonSet.Spec.Selector, func(pod *v1.Pod) {
+	k8s.ForEachPod(cfg, daemonSet.Namespace, daemonSet.Spec.Selector, func(pod *v1.Pod, _ int) {
 		pathForPod := filepath.Join(pathForAgent, "pods", pod.Name)
 		port := identifyPodPort(pod)
 		delay := time.Millisecond * 500
