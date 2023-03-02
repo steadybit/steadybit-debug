@@ -74,6 +74,9 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 		FormatJson: false,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "remote error: tls: bad certificate") {
+			log.Error().Msgf("Please provide proper TLS certificates for %s ", options.PodNamespace+"/"+options.PodName)
+		}
 		log.Error().Msgf("Failed to get '%s'", podUrl.String())
 		return
 	}
@@ -110,8 +113,7 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 
 	var wg sync.WaitGroup
 	for _, urlToCurl := range urlsToCurlSlice {
-		filename := strings.ReplaceAll(urlToCurl.Path, "/", "_")
-		outputPath := fmt.Sprintf("%s/%s.yml", options.PathForPod, filename)
+		outputPath := getOutputPath(options.PathForPod, urlToCurl)
 		fullUrl := podUrl.JoinPath(urlToCurl.Path)
 		wg.Add(1)
 		urlToCurl := urlToCurl
@@ -128,6 +130,13 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 		}()
 	}
 	wg.Wait()
+}
+
+func getOutputPath(pathForPod string, urlToCurl urlsToCurl) string {
+	filename := strings.ReplaceAll(urlToCurl.Path, "/", "_")
+	filename = fmt.Sprintf("%s_%s.yml", urlToCurl.Method, filename)
+	outputPath := fmt.Sprintf("%s/%s", pathForPod, filename)
+	return outputPath
 }
 
 func findDiscoveredTargetsUrl(cfg *config.Config, method discovery_kit_api.DescribingEndpointReferenceMethod, path string, podUrl *url.URL, useHttps bool, urlsToCurlSlicePtr *[]urlsToCurl) {
