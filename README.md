@@ -53,6 +53,7 @@ existing within your current working directory.
 platform:
   namespace: chaos-eng
   deployment: platform
+  exportDatabase: false
 agent:
   namespace: chaos-eng
 ```
@@ -67,6 +68,7 @@ If you configured your extensions to use mTLS between agent and extension, you n
 platform:
   namespace: chaos-eng
   deployment: platform
+  exportDatabase: false
 agent:
   namespace: chaos-eng
 tls:
@@ -82,6 +84,18 @@ steadybit-debug --platform-deployment platform \
    --cert-chain-file /Path/to/tls.crt \
    --cert-key-file= /Path/to/tls.key
 ```
+
+## Database Export support
+If you need to export the database of your platform, you can do this by adding the following to your `steadybit-debug.yml` file:
+
+```yaml
+platform:
+  namespace: chaos-eng
+  deployment: platform
+  exportDatabase: true
+```
+This is disabled by default.
+
 ## Execution
 
 You execute the tool via `steadybit-debug`. Once executed, you will find that the

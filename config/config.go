@@ -24,8 +24,9 @@ type Config struct {
 }
 
 type PlatformConfig struct {
-	Deployment string `yaml:"deployment" long:"platform-deployment" description:"Kubernetes deployment name of the Steadybit platform"`
-	Namespace  string `yaml:"namespace" long:"platform-namespace" description:"Kubernetes namespace name of the Steadybit platform"`
+	Deployment     string `yaml:"deployment" long:"platform-deployment" description:"Kubernetes deployment name of the Steadybit platform"`
+	Namespace      string `yaml:"namespace" long:"platform-namespace" description:"Kubernetes namespace name of the Steadybit platform"`
+	ExportDatabase bool   `yaml:"exportDatabase" long:"export-database" description:"Export database?"`
 }
 
 type AgentConfig struct {
@@ -70,8 +71,9 @@ func newConfig() Config {
 			KubeConfigPath: kubeConfigPath,
 		},
 		Platform: PlatformConfig{
-			Namespace:  "steadybit-platform",
-			Deployment: "steadybit-platform",
+			Namespace:      "steadybit-platform",
+			Deployment:     "steadybit-platform",
+			ExportDatabase: false,
 		},
 		Agent: AgentConfig{
 			Namespace: "steadybit-agent",

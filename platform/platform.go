@@ -27,7 +27,7 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 	k8s.ForEachPod(cfg, deployment.Namespace, deployment.Spec.Selector, func(pod *v1.Pod, idx int) {
 		pathForPod := filepath.Join(pathForPlatform, "pods", pod.Name)
 		var wg sync.WaitGroup
-		if idx == 0 {
+		if idx == 0 && cfg.Platform.ExportDatabase {
 			wg.Add(1)
 			go func() {
 				log.Debug().Msgf("Downloading database export for platform %s", pod.Name)
