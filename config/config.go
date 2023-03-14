@@ -15,18 +15,24 @@ import (
 )
 
 type Config struct {
-	OutputPath string           `yaml:"outputPath" short:"o" long:"output" description:"Path to output directory that will contain the debugging information"`
-	NoCleanup  bool             `yaml:"noCleanup" long:"no-cleanup" description:"Skip output directory deletion on command completion?"`
-	Kubernetes KubernetesConfig `yaml:"kubernetes"`
-	Platform   PlatformConfig   `yaml:"platform"`
-	Agent      AgentConfig      `yaml:"agent"`
-	Tls        Tls              `yaml:"tls"`
+	OutputPath           string                     `yaml:"outputPath" short:"o" long:"output" description:"Path to output directory that will contain the debugging information"`
+	NoCleanup            bool                       `yaml:"noCleanup" long:"no-cleanup" description:"Skip output directory deletion on command completion?"`
+	Kubernetes           KubernetesConfig           `yaml:"kubernetes"`
+	Platform             PlatformConfig             `yaml:"platform"`
+	PlatformPortSplitter PlatformportSplitterConfig `yaml:"platform-port-splitter"`
+	Agent                AgentConfig                `yaml:"agent"`
+	Tls                  Tls                        `yaml:"tls"`
 }
 
 type PlatformConfig struct {
 	Deployment     string `yaml:"deployment" long:"platform-deployment" description:"Kubernetes deployment name of the Steadybit platform"`
 	Namespace      string `yaml:"namespace" long:"platform-namespace" description:"Kubernetes namespace name of the Steadybit platform"`
 	ExportDatabase bool   `yaml:"exportDatabase" long:"export-database" description:"Export database?"`
+}
+
+type PlatformportSplitterConfig struct {
+	Deployment string `yaml:"deployment" long:"platform-splitter-deployment" description:"Kubernetes deployment name of the Steadybit platform splitter"`
+	Namespace  string `yaml:"namespace" long:"platform-splitter-namespace" description:"Kubernetes namespace name of the Steadybit platform splitter"`
 }
 
 type AgentConfig struct {
@@ -74,6 +80,10 @@ func newConfig() Config {
 			Namespace:      "steadybit-platform",
 			Deployment:     "steadybit-platform",
 			ExportDatabase: false,
+		},
+		PlatformPortSplitter: PlatformportSplitterConfig{
+			Namespace:  "steadybit-platform",
+			Deployment: "platform-port-splitter",
 		},
 		Agent: AgentConfig{
 			Namespace: "steadybit-agent",

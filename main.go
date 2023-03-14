@@ -41,11 +41,16 @@ func main() {
 
 func gatherInformation(cfg *config.Config) {
 	var wg sync.WaitGroup
-	wg.Add(4)
+	wg.Add(5)
 
 	go func() {
 		defer wg.Done()
 		platform.AddPlatformDebuggingInformation(cfg)
+	}()
+
+	go func() {
+		defer wg.Done()
+		platform.AddPlatformPortSplitterDebuggingInformation(cfg)
 	}()
 
 	go func() {
