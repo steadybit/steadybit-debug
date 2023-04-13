@@ -154,43 +154,6 @@ it collected for your installation!
 │             │         ├── top.7.txt
 │             │         ├── top.8.txt
 │             │         └── top.9.txt
-│             ├── steadybit-agent-hv7wh
-│             │         ├── actions_metadata.yml
-│             │         ├── config.yml
-│             │         ├── connection_stats.yml
-│             │         ├── connections.yml
-│             │         ├── description.txt
-│             │         ├── discovery_info.yml
-│             │         ├── env.yml
-│             │         ├── health.yml
-│             │         ├── info.yml
-│             │         ├── logs.txt
-│             │         ├── logs_previous.txt
-│             │         ├── prometheus_metrics.0.txt
-│             │         ├── prometheus_metrics.1.txt
-│             │         ├── prometheus_metrics.2.txt
-│             │         ├── prometheus_metrics.3.txt
-│             │         ├── prometheus_metrics.4.txt
-│             │         ├── prometheus_metrics.5.txt
-│             │         ├── prometheus_metrics.6.txt
-│             │         ├── prometheus_metrics.7.txt
-│             │         ├── prometheus_metrics.8.txt
-│             │         ├── prometheus_metrics.9.txt
-│             │         ├── self_test.yml
-│             │         ├── target_stats.yml
-│             │         ├── target_type_description.yml
-│             │         ├── targets.yml
-│             │         ├── threaddump.yml
-│             │         ├── top.0.txt
-│             │         ├── top.1.txt
-│             │         ├── top.2.txt
-│             │         ├── top.3.txt
-│             │         ├── top.4.txt
-│             │         ├── top.5.txt
-│             │         ├── top.6.txt
-│             │         ├── top.7.txt
-│             │         ├── top.8.txt
-│             │         └── top.9.txt
 │             └── steadybit-agent-nbl9x
 │                 ├── actions_metadata.yml
 │                 ├── config.yml
@@ -344,6 +307,84 @@ it collected for your installation!
 │         └── ip-10-10-94-179.eu-central-1.compute.internal
 │             ├── config.yaml
 │             └── description.txt
+├── outpost
+│         ├── config.yaml
+│         ├── description.txt
+│         └── pods
+│             ├── steadybit-outpost-gpznj
+│             │         ├── actions_metadata.yml
+│             │         ├── config.yml
+│             │         ├── connection_stats.yml
+│             │         ├── connections.yml
+│             │         ├── description.txt
+│             │         ├── discovery_info.yml
+│             │         ├── env.yml
+│             │         ├── health.yml
+│             │         ├── info.yml
+│             │         ├── logs.txt
+│             │         ├── logs_previous.txt
+│             │         ├── prometheus_metrics.0.txt
+│             │         ├── prometheus_metrics.1.txt
+│             │         ├── prometheus_metrics.2.txt
+│             │         ├── prometheus_metrics.3.txt
+│             │         ├── prometheus_metrics.4.txt
+│             │         ├── prometheus_metrics.5.txt
+│             │         ├── prometheus_metrics.6.txt
+│             │         ├── prometheus_metrics.7.txt
+│             │         ├── prometheus_metrics.8.txt
+│             │         ├── prometheus_metrics.9.txt
+│             │         ├── self_test.yml
+│             │         ├── target_stats.yml
+│             │         ├── target_type_description.yml
+│             │         ├── targets.yml
+│             │         ├── threaddump.yml
+│             │         ├── top.0.txt
+│             │         ├── top.1.txt
+│             │         ├── top.2.txt
+│             │         ├── top.3.txt
+│             │         ├── top.4.txt
+│             │         ├── top.5.txt
+│             │         ├── top.6.txt
+│             │         ├── top.7.txt
+│             │         ├── top.8.txt
+│             │         └── top.9.txt
+│             └── steadybit-outpost-nbl9x
+│                 ├── actions_metadata.yml
+│                 ├── config.yml
+│                 ├── connection_stats.yml
+│                 ├── connections.yml
+│                 ├── description.txt
+│                 ├── discovery_info.yml
+│                 ├── env.yml
+│                 ├── health.yml
+│                 ├── info.yml
+│                 ├── logs.txt
+│                 ├── logs_previous.txt
+│                 ├── prometheus_metrics.0.txt
+│                 ├── prometheus_metrics.1.txt
+│                 ├── prometheus_metrics.2.txt
+│                 ├── prometheus_metrics.3.txt
+│                 ├── prometheus_metrics.4.txt
+│                 ├── prometheus_metrics.5.txt
+│                 ├── prometheus_metrics.6.txt
+│                 ├── prometheus_metrics.7.txt
+│                 ├── prometheus_metrics.8.txt
+│                 ├── prometheus_metrics.9.txt
+│                 ├── self_test.yml
+│                 ├── target_stats.yml
+│                 ├── target_type_description.yml
+│                 ├── targets.yml
+│                 ├── threaddump.yml
+│                 ├── top.0.txt
+│                 ├── top.1.txt
+│                 ├── top.2.txt
+│                 ├── top.3.txt
+│                 ├── top.4.txt
+│                 ├── top.5.txt
+│                 ├── top.6.txt
+│                 ├── top.7.txt
+│                 ├── top.8.txt
+│                 └── top.9.txt
 └── platform
     ├── config.yaml
     ├── database.zip

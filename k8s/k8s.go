@@ -46,6 +46,18 @@ func FindDaemonSet(cfg *config.Config, namespace string, name string) (*appsv1.D
 		Get(context.Background(), name, metav1.GetOptions{})
 }
 
+func FindStatefulSet(cfg *config.Config, namespace string, name string) (*appsv1.StatefulSet, error) {
+	client, err := cfg.Kubernetes.Client()
+	if err != nil {
+		return nil, err
+	}
+
+	return client.
+		AppsV1().
+		StatefulSets(namespace).
+		Get(context.Background(), name, metav1.GetOptions{})
+}
+
 func AddDescription(config *config.Config, outputPath string, kind string, namespace string, name string) {
 	output.AddCommandOutput(output.AddCommandOutputOptions{
 		Config:      config,

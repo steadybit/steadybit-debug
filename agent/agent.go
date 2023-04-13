@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 Steadybit GmbH
+// SPDX-FileCopyrightText: 2023 Steadybit GmbH
 
 package agent
 
@@ -9,24 +9,47 @@ import (
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/k8s"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 func AddAgentDebuggingInformation(cfg *config.Config) {
-	daemonSet, err := k8s.FindDaemonSet(cfg, cfg.Agent.Namespace, cfg.Agent.DaemonSet)
-	if err != nil {
-		log.Warn().Msgf("Failed to find daemon set '%s' in '%s': %s", cfg.Agent.DaemonSet, cfg.Agent.Namespace, err)
-		return
-	}
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	pathForAgent := filepath.Join(cfg.OutputPath, "agent")
-	k8s.AddDescription(cfg, filepath.Join(pathForAgent, "description.txt"), "daemonset", daemonSet.Namespace, daemonSet.Name)
-	k8s.AddConfig(cfg, filepath.Join(pathForAgent, "config.yaml"), "daemonset", daemonSet.Namespace, daemonSet.Name)
+	go func() {
+		defer wg.Done()
+		daemonSet, err := k8s.FindDaemonSet(cfg, cfg.Agent.Namespace, cfg.Agent.DaemonSet)
+		if err != nil {
+			log.Warn().Msgf("Failed to find agent daemon set '%s' in '%s': %s", cfg.Agent.DaemonSet, cfg.Agent.Namespace, err)
+		} else {
+			addAgentDebuggingData(cfg, filepath.Join(cfg.OutputPath, "agent"), daemonSet.Namespace, daemonSet.Name, "daemonset", daemonSet.Spec.Selector)
+		}
+	}()
 
-	k8s.ForEachPod(cfg, daemonSet.Namespace, daemonSet.Spec.Selector, func(pod *v1.Pod, _ int) {
+	go func() {
+		defer wg.Done()
+		statefulSet, err := k8s.FindStatefulSet(cfg, cfg.Outpost.Namespace, cfg.Outpost.StatefulSet)
+		if err != nil {
+			log.Warn().Msgf("Failed to find outpost stateful set '%s' in '%s': %s", cfg.Outpost.StatefulSet, cfg.Outpost.Namespace, err)
+		} else {
+			addAgentDebuggingData(cfg, filepath.Join(cfg.OutputPath, "outpost"), statefulSet.Namespace, statefulSet.Name, "statefulset", statefulSet.Spec.Selector)
+		}
+	}()
+
+	wg.Wait()
+}
+
+func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace string, name string, kind string, selector *metav1.LabelSelector) {
+	pathForAgent := outputPath
+	k8s.AddDescription(cfg, filepath.Join(pathForAgent, "description.txt"), kind, namespace, name)
+	k8s.AddConfig(cfg, filepath.Join(pathForAgent, "config.yaml"), kind, namespace, name)
+
+	k8s.ForEachPod(cfg, namespace, selector, func(pod *v1.Pod, _ int) {
 		pathForPod := filepath.Join(pathForAgent, "pods", pod.Name)
 		port := identifyPodPort(pod)
 		delay := time.Millisecond * 500
