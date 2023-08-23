@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/k8s"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
@@ -38,50 +39,73 @@ func AddExtensionDebuggingInformation(cfg *config.Config) {
 }
 
 func findDebugInformationInNamespace(namespace string, cfg *config.Config) {
+	var wg sync.WaitGroup
+
 	services, err := findExtensionsServices(cfg, namespace)
 	if err != nil {
 		log.Warn().Msgf("Failed to find services set '%s': %s", namespace, err)
 		return
 	}
-
-	var wg sync.WaitGroup
 	for _, service := range services {
 		wg.Add(1)
 		go func(service v1.Service) {
 			defer wg.Done()
-
-			pathForExtension := filepath.Join(cfg.OutputPath, "extensions", service.Namespace, service.Name)
-			k8s.AddDescription(cfg, filepath.Join(pathForExtension, "description.txt"), "service", service.Namespace, service.Name)
-			k8s.AddConfig(cfg, filepath.Join(pathForExtension, "config.yaml"), "service", service.Namespace, service.Name)
-
-			k8s.ForEachPodViaMapSelector(cfg, service.Namespace, service.Spec.Selector, func(pod *v1.Pod, _ int) {
-				pathForPod := filepath.Join(pathForExtension, "pods", pod.Name)
-
-				k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
-				k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
-				k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
-				k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
-				k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
-
-				ports := identifyPodPorts(pod, service)
-				for _, port := range ports {
-					folderName := "http"
-					if port.tls {
-						folderName = "https"
-					}
-					TraverseExtensionEndpoints(TraverseExtensionEndpointsOptions{
-						Config:       cfg,
-						PodNamespace: pod.Namespace,
-						PodName:      pod.Name,
-						PathForPod:   filepath.Join(pathForPod, folderName),
-						Port:         port.port,
-						UseHttps:     port.tls,
-					})
-				}
+			forEachPod(cfg, "service", service.Namespace, service.Name, service.Spec.Selector, func(pod *v1.Pod) []podPort {
+				return identifyPodPorts(pod, service.Annotations)
 			})
 		}(service)
 	}
+
+	daemonsets, err := findExtensionDaemonsets(cfg, namespace)
+	if err != nil {
+		log.Warn().Msgf("Failed to find daemonsets set '%s': %s", namespace, err)
+		return
+	}
+	for _, daemonset := range daemonsets {
+		wg.Add(1)
+		go func(daemonset appsv1.DaemonSet) {
+			defer wg.Done()
+			forEachPod(cfg, "daemonset", daemonset.Namespace, daemonset.Name, daemonset.Spec.Selector.MatchLabels, func(pod *v1.Pod) []podPort {
+				return identifyPodPorts(pod, pod.Annotations)
+			})
+		}(daemonset)
+	}
+
 	wg.Wait()
+}
+
+type identifyPorts func(pod *v1.Pod) []podPort
+
+func forEachPod(cfg *config.Config, kind string, namespace string, name string, selector map[string]string, portsFn identifyPorts) {
+	pathForExtension := filepath.Join(cfg.OutputPath, "extensions", namespace, name)
+	k8s.AddDescription(cfg, filepath.Join(pathForExtension, "description.txt"), kind, namespace, name)
+	k8s.AddConfig(cfg, filepath.Join(pathForExtension, "config.yaml"), kind, namespace, name)
+
+	k8s.ForEachPodViaMapSelector(cfg, namespace, selector, func(pod *v1.Pod, _ int) {
+		pathForPod := filepath.Join(pathForExtension, "pods", pod.Name)
+
+		k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
+		k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
+		k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
+		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
+		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
+
+		ports := portsFn(pod)
+		for _, port := range ports {
+			folderName := "http"
+			if port.tls {
+				folderName = "https"
+			}
+			TraverseExtensionEndpoints(TraverseExtensionEndpointsOptions{
+				Config:       cfg,
+				PodNamespace: pod.Namespace,
+				PodName:      pod.Name,
+				PathForPod:   filepath.Join(pathForPod, folderName),
+				Port:         port.port,
+				UseHttps:     port.tls,
+			})
+		}
+	})
 }
 
 type extensionAutoDiscoveryExtensionTls struct {
@@ -102,9 +126,9 @@ type podPort struct {
 	tls  bool
 }
 
-func identifyPodPorts(pod *v1.Pod, service v1.Service) []podPort {
+func identifyPodPorts(pod *v1.Pod, annotations map[string]string) []podPort {
 	//try to find the port via annotations
-	extensionAutoDiscoveryString, ok := service.Annotations[ExtensionAutoDiscoveryAnnotation]
+	extensionAutoDiscoveryString, ok := annotations[ExtensionAutoDiscoveryAnnotation]
 	var defaultPort = podPort{
 		port: 8080,
 		tls:  false,
@@ -178,6 +202,28 @@ func findExtensionsServices(cfg *config.Config, namespace string) ([]v1.Service,
 		_, ok := service.Annotations[ExtensionAutoDiscoveryAnnotation]
 		if ok {
 			result = append(result, service)
+		}
+	}
+
+	return result, nil
+}
+
+func findExtensionDaemonsets(cfg *config.Config, namespace string) ([]appsv1.DaemonSet, error) {
+	client, err := cfg.Kubernetes.Client()
+	if err != nil {
+		return nil, err
+	}
+
+	listOfDaemonsets, err := client.AppsV1().DaemonSets(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]appsv1.DaemonSet, 0, len(listOfDaemonsets.Items))
+	for _, daemonset := range listOfDaemonsets.Items {
+		_, ok := daemonset.Spec.Template.Annotations[ExtensionAutoDiscoveryAnnotation]
+		if ok {
+			result = append(result, daemonset)
 		}
 	}
 
