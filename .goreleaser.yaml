@@ -3,7 +3,7 @@ before:
   hooks:
     - go mod download
 release:
-  prerelease: false
+  prerelease: "false"
 builds:
   - env:
       - CGO_ENABLED=0
@@ -18,20 +18,11 @@ builds:
       - ppc64le
       - s390x
     goarm:
-      - 7
+      - "7"
     flags:
       - -trimpath
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      bit: Arm
-      bitv6: Arm6
-      bitv7: Arm7
-      # 386: i386
-      amd64: x86_64
 checksum:
   name_template: "checksums.txt"
 snapshot:
