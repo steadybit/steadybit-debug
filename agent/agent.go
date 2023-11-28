@@ -113,6 +113,12 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 					}, {
 						OutputPath: filepath.Join(pathForPod, "actions_metadata.yml"),
 						Url:        fmt.Sprintf("http://localhost:%d/actions/metadata", port),
+					}, {
+						OutputPath: filepath.Join(pathForPod, "advice_definition.yml"),
+						Url:        fmt.Sprintf("http://localhost:%d/advice/definition", port),
+					}, {
+						OutputPath: filepath.Join(pathForPod, "enrichtment_rules.yml"),
+						Url:        fmt.Sprintf("http://localhost:%d/targetEnrichment/rules", port),
 					},
 				},
 			})
