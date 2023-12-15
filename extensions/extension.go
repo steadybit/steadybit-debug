@@ -139,7 +139,7 @@ func getOutputPath(pathForPod string, urlToCurl urlsToCurl) string {
 	return outputPath
 }
 
-func findDiscoveredTargetsUrl(cfg *config.Config, method discovery_kit_api.DescribingEndpointReferenceMethod, path string, podUrl *url.URL, useHttps bool, urlsToCurlSlicePtr *[]urlsToCurl) {
+func findDiscoveredTargetsUrl(cfg *config.Config, method discovery_kit_api.ReadHttpMethod, path string, podUrl *url.URL, useHttps bool, urlsToCurlSlicePtr *[]urlsToCurl) {
 	fullUrl := podUrl.JoinPath(path)
 	body, err := output.DoHttp(output.HttpOptions{
 		Config:     cfg,
