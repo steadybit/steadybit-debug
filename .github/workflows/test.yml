@@ -28,4 +28,4 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           args: --project-name=${{ github.repository }} --target-reference=${{ inputs.target_ref || github.ref_name }}
-          command: monitor
+          command: test
