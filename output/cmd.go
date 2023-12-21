@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
+	"io"
 	"os/exec"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ type AddCommandOutputOptions struct {
 	OutputPath             string
 	Executions             int
 	DelayBetweenExecutions *time.Duration
+	Stdin                  io.Reader
 }
 
 // AddCommandOutput opts.OutputPath must include a %d to replace the execution number when opts.Executions > 1
@@ -50,6 +52,9 @@ func addCommandOutputWithoutLoop(opts AddCommandOutputOptions, outputPath string
 
 	cmd := exec.Command(opts.CommandName, opts.CommandArgs...)
 	log.Debug().Msgf("Executing: %s", cmd.String())
+	if opts.Stdin != nil {
+		cmd.Stdin = opts.Stdin
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)

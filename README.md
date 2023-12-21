@@ -54,7 +54,7 @@ platform:
   namespace: chaos-eng
   deployment: platform
   exportDatabase: false
-agent:
+outpost:
   namespace: chaos-eng
 ```
 

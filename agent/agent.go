@@ -53,12 +53,18 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 		pathForPod := filepath.Join(pathForAgent, "pods", pod.Name)
 		port := identifyPodPort(pod)
 		delay := time.Millisecond * 500
+		platformUrl := identifyPlatformUrl(pod)
 
 		k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
 		k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
 		k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
 		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
+
+		k8s.AddHttpConnectionTest(cfg, filepath.Join(pathForPod, "platform_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
+		k8s.AddWebsocketCurlHttp1ConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocket_http1_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
+		k8s.AddWebsocketCurlHttp2ConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocket_http2_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
+		k8s.AddWebsocketWebsocatConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocat_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
 
 		k8s.AddPodHttpMultipleEndpointOutput(
 			k8s.AddPodHttpEndpointsOutputOptions{
@@ -139,4 +145,17 @@ func identifyPodPort(pod *v1.Pod) int {
 
 	// try the default agent port
 	return 42899
+}
+
+func identifyPlatformUrl(pod *v1.Pod) string {
+	for _, container := range pod.Spec.Containers {
+		for _, env := range container.Env {
+			if strings.ToUpper(env.Name) == "STEADYBIT_AGENT_REGISTER_URL" {
+				return env.Value
+			}
+		}
+	}
+
+	// try the default saas url
+	return "https://platform.steadybit.com"
 }

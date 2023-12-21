@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/output"
+	"io"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +19,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -63,6 +65,35 @@ func AddDescription(config *config.Config, outputPath string, kind string, names
 		Config:      config,
 		CommandName: "kubectl",
 		CommandArgs: []string{"describe", kind, "-n", namespace, name},
+		OutputPath:  outputPath,
+	})
+}
+
+func AddHttpConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
+	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"--head", "-v", url + "/agent"}, nil)
+}
+
+func AddWebsocketCurlHttp1ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
+	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v", "--http1.1"}, nil)
+}
+
+func AddWebsocketCurlHttp2ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
+	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v"}, nil)
+}
+
+func AddWebsocketWebsocatConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
+	wsUrl := strings.ReplaceAll(url, "https://", "wss://")
+	wsUrl = strings.ReplaceAll(wsUrl, "http://", "ws://")
+	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.WebsocatImage, "websocat", []string{wsUrl + "/ws", "-v"}, strings.NewReader(" "))
+}
+
+func addWithEphemeralContainer(config *config.Config, outputPath string, namespace string, name string, containerName string, imageName string, command string, args []string, stdin io.Reader) {
+	commandArgs := []string{"debug", "-it", name, "-n", namespace, "--target", containerName, "--image", imageName, "-c", "steadybit-debug-" + strconv.Itoa(int(time.Now().Unix())), "--", command}
+	commandArgs = append(commandArgs, args...)
+	output.AddCommandOutput(output.AddCommandOutputOptions{
+		Config:      config,
+		CommandName: "kubectl",
+		CommandArgs: commandArgs,
 		OutputPath:  outputPath,
 	})
 }
