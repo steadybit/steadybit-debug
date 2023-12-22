@@ -10,6 +10,7 @@ import (
 	"github.com/steadybit/steadybit-debug/k8s"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -62,6 +63,12 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
 
 		k8s.AddHttpConnectionTest(cfg, filepath.Join(pathForPod, "platform_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl+"/agent")
+		url, err := url.Parse(platformUrl)
+		if err != nil {
+			log.Err(err).Msgf("Failed to parse platform url '%s'", platformUrl)
+		} else {
+			k8s.AddTracerouteConnectionTest(cfg, filepath.Join(pathForPod, "platform_traceroute_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, url.Host)
+		}
 		k8s.AddWebsocketCurlHttp1ConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocket_http1_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
 		k8s.AddWebsocketCurlHttp2ConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocket_http2_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
 		k8s.AddWebsocketWebsocatConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocat_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)

@@ -42,10 +42,11 @@ type AgentConfig struct {
 }
 
 type OutpostConfig struct {
-	StatefulSet   string `yaml:"statefulSet" long:"outpost-stateful-set" description:"Kubernetes stateful set name of the Steadybit outpost"`
-	Namespace     string `yaml:"namespace" long:"outpost-namespace" description:"Kubernetes namespace name of the Steadybit outpost"`
-	CurlImage     string `yaml:"curlImage" long:"outpost-curl-image" description:"Image to use for connection testing with curl installed"`
-	WebsocatImage string `yaml:"websocatImage" long:"outpost-websocat-image" description:"Image to use for connection testing with websocat installed"`
+	StatefulSet     string `yaml:"statefulSet" long:"outpost-stateful-set" description:"Kubernetes stateful set name of the Steadybit outpost"`
+	Namespace       string `yaml:"namespace" long:"outpost-namespace" description:"Kubernetes namespace name of the Steadybit outpost"`
+	CurlImage       string `yaml:"curlImage" long:"outpost-curl-image" description:"Image to use for connection testing with curl installed"`
+	WebsocatImage   string `yaml:"websocatImage" long:"outpost-websocat-image" description:"Image to use for connection testing with websocat installed"`
+	TracerouteImage string `yaml:"tracerouteImage" long:"outpost-traceroute-image" description:"Image to use for connection testing with traceroute installed"`
 }
 
 type Tls struct {
@@ -98,10 +99,11 @@ func newConfig() Config {
 			DaemonSet: "steadybit-agent",
 		},
 		Outpost: OutpostConfig{
-			Namespace:     "steadybit-outpost",
-			StatefulSet:   "steadybit-outpost",
-			CurlImage:     "curlimages/curl",
-			WebsocatImage: "mtilson/websocat",
+			Namespace:       "steadybit-outpost",
+			StatefulSet:     "steadybit-outpost",
+			CurlImage:       "curlimages/curl",
+			WebsocatImage:   "mtilson/websocat",
+			TracerouteImage: "alpine",
 		},
 		Tls: Tls{
 			CertChainFile: "",

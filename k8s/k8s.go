@@ -74,6 +74,10 @@ func AddHttpConnectionTest(config *config.Config, outputPath string, namespace s
 	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", url}, nil)
 }
 
+func AddTracerouteConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, host string) {
+	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.TracerouteImage, "traceroute", []string{host}, nil)
+}
+
 func AddWebsocketCurlHttp1ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
 	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v", "--http1.1"}, nil)
 }
