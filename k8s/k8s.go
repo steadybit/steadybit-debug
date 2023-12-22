@@ -6,6 +6,7 @@ package k8s
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
@@ -70,7 +71,7 @@ func AddDescription(config *config.Config, outputPath string, kind string, names
 }
 
 func AddHttpConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
-	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"--head", "-v", url + "/agent"}, nil)
+	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", url}, nil)
 }
 
 func AddWebsocketCurlHttp1ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
@@ -305,6 +306,50 @@ func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) 
 		}(endpoint)
 	}
 	wg.Wait()
+
+}
+
+type Connection struct {
+	Url    string
+	Auth   bool
+	Method string
+}
+
+func GetExtensionConnections(sharedPort int, podConfig PodConfig, cfg *config.Config) []Connection {
+	forwardingHostWithPort, cmd, err := PreparePortforwarding(podConfig, sharedPort)
+	if err != nil {
+		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
+		return nil
+	}
+
+	defer func() {
+		KillProcess(cmd, podConfig)
+	}()
+
+	podUrl, err := url.Parse(fmt.Sprintf("http://localhost:%d/extension/connections", sharedPort))
+	if err != nil {
+		log.Error().Msgf("Failed to parse URL '%s'", forwardingHostWithPort)
+		return nil
+	}
+	podUrl.Host = forwardingHostWithPort
+	log.Info().Msgf("Using URL '%s' for extension connection test", podUrl.String())
+	body, err := output.DoHttp(output.HttpOptions{
+		Config:     cfg,
+		Method:     "GET",
+		URL:        *podUrl,
+		FormatJson: false,
+	})
+	if err != nil {
+		log.Error().Msgf("Failed to read response body")
+		return nil
+	}
+	var connections []Connection
+	err = json.Unmarshal(body, &connections)
+	if err != nil {
+		log.Error().Msgf("Failed to unmarshal response body")
+		return nil
+	}
+	return connections
 
 }
 func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {

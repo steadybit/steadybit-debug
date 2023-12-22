@@ -61,7 +61,7 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
 
-		k8s.AddHttpConnectionTest(cfg, filepath.Join(pathForPod, "platform_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
+		k8s.AddHttpConnectionTest(cfg, filepath.Join(pathForPod, "platform_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl+"/agent")
 		k8s.AddWebsocketCurlHttp1ConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocket_http1_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
 		k8s.AddWebsocketCurlHttp2ConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocket_http2_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
 		k8s.AddWebsocketWebsocatConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocat_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
@@ -128,6 +128,15 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 					},
 				},
 			})
+
+		extensionConnections := k8s.GetExtensionConnections(port, k8s.PodConfig{
+			PodNamespace: pod.Namespace,
+			PodName:      pod.Name,
+			Config:       cfg,
+		}, cfg)
+		for idx, extensionConnection := range extensionConnections {
+			k8s.AddHttpConnectionTest(cfg, filepath.Join(pathForPod, fmt.Sprintf("extension_connection_test_%d.txt", idx)), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, extensionConnection.Url)
+		}
 	})
 }
 
