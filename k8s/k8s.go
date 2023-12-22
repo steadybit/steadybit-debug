@@ -62,7 +62,7 @@ func FindStatefulSet(cfg *config.Config, namespace string, name string) (*appsv1
 }
 
 func AddDescription(config *config.Config, outputPath string, kind string, namespace string, name string) {
-	output.AddCommandOutput(output.AddCommandOutputOptions{
+	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:      config,
 		CommandName: "kubectl",
 		CommandArgs: []string{"describe", kind, "-n", namespace, name},
@@ -71,31 +71,33 @@ func AddDescription(config *config.Config, outputPath string, kind string, names
 }
 
 func AddHttpConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
-	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", url}, nil)
+	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", url}, nil)
 }
 
 func AddTracerouteConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, host string) {
-	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.TracerouteImage, "traceroute", []string{host}, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	addWithEphemeralContainer(ctx, config, outputPath, namespace, name, containerName, config.Outpost.TracerouteImage, "traceroute", []string{host}, nil)
 }
 
 func AddWebsocketCurlHttp1ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
-	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v", "--http1.1"}, nil)
+	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v", "--http1.1"}, nil)
 }
 
 func AddWebsocketCurlHttp2ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
-	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v"}, nil)
+	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v"}, nil)
 }
 
 func AddWebsocketWebsocatConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
 	wsUrl := strings.ReplaceAll(url, "https://", "wss://")
 	wsUrl = strings.ReplaceAll(wsUrl, "http://", "ws://")
-	addWithEphemeralContainer(config, outputPath, namespace, name, containerName, config.Outpost.WebsocatImage, "websocat", []string{wsUrl + "/ws", "-v"}, strings.NewReader(" "))
+	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.WebsocatImage, "websocat", []string{wsUrl + "/ws", "-v"}, strings.NewReader(" "))
 }
 
-func addWithEphemeralContainer(config *config.Config, outputPath string, namespace string, name string, containerName string, imageName string, command string, args []string, stdin io.Reader) {
+func addWithEphemeralContainer(ctx context.Context, config *config.Config, outputPath string, namespace string, name string, containerName string, imageName string, command string, args []string, stdin io.Reader) {
 	commandArgs := []string{"debug", "-it", name, "-n", namespace, "--target", containerName, "--image", imageName, "-c", "steadybit-debug-" + strconv.Itoa(int(time.Now().Unix())), "--", command}
 	commandArgs = append(commandArgs, args...)
-	output.AddCommandOutput(output.AddCommandOutputOptions{
+	output.AddCommandOutput(ctx, output.AddCommandOutputOptions{
 		Config:      config,
 		CommandName: "kubectl",
 		CommandArgs: commandArgs,
@@ -104,7 +106,7 @@ func addWithEphemeralContainer(config *config.Config, outputPath string, namespa
 }
 
 func AddConfig(config *config.Config, outputPath string, kind string, namespace string, name string) {
-	output.AddCommandOutput(output.AddCommandOutputOptions{
+	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:      config,
 		CommandName: "kubectl",
 		CommandArgs: []string{"get", kind, "-n", namespace, "-o", "yaml", name},
@@ -205,7 +207,7 @@ func ForEachNode(cfg *config.Config, fn func(node *v1.Node)) {
 }
 
 func AddLogs(cfg *config.Config, path string, namespace string, name string) {
-	output.AddCommandOutput(output.AddCommandOutputOptions{
+	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:      cfg,
 		CommandName: "kubectl",
 		CommandArgs: []string{"logs", "-n", namespace, "--all-containers", name},
@@ -214,7 +216,7 @@ func AddLogs(cfg *config.Config, path string, namespace string, name string) {
 }
 
 func AddPreviousLogs(cfg *config.Config, path string, namespace string, name string) {
-	output.AddCommandOutput(output.AddCommandOutputOptions{
+	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:      cfg,
 		CommandName: "kubectl",
 		CommandArgs: []string{"logs", "-n", namespace, "--previous", "--all-containers", name},
@@ -225,7 +227,7 @@ func AddPreviousLogs(cfg *config.Config, path string, namespace string, name str
 // AddResourceUsage path must include '%d' to replace the execution number within the file path
 func AddResourceUsage(cfg *config.Config, path string, namespace string, name string) {
 	delay := time.Millisecond * 500
-	output.AddCommandOutput(output.AddCommandOutputOptions{
+	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:                 cfg,
 		CommandName:            "kubectl",
 		CommandArgs:            []string{"top", "pod", "-n", namespace, "--containers", name},
@@ -299,7 +301,7 @@ func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) 
 			}
 			podUrl.Host = forwardingHostWithPort
 
-			output.AddCommandOutput(output.AddCommandOutputOptions{
+			output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 				Config:                 options.PodConfig.Config,
 				OutputPath:             endpoint.OutputPath,
 				Executions:             endpoint.Executions,
@@ -383,7 +385,7 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 
 	podUrl.Host = host
 
-	output.AddCommandOutput(output.AddCommandOutputOptions{
+	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:                 options.Config,
 		CommandName:            "curl",
 		CommandArgs:            []string{"-s", podUrl.String()},

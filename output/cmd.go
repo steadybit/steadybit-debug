@@ -1,6 +1,7 @@
 package output
 
 import (
+	"context"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
@@ -21,7 +22,7 @@ type AddCommandOutputOptions struct {
 }
 
 // AddCommandOutput opts.OutputPath must include a %d to replace the execution number when opts.Executions > 1
-func AddCommandOutput(opts AddCommandOutputOptions) {
+func AddCommandOutput(ctx context.Context, opts AddCommandOutputOptions) {
 	if opts.Executions < 1 {
 		opts.Executions = 1
 	}
@@ -38,19 +39,19 @@ func AddCommandOutput(opts AddCommandOutputOptions) {
 			filePath = fmt.Sprintf(filePath, i)
 		}
 
-		addCommandOutputWithoutLoop(opts, filePath)
+		addCommandOutputWithoutLoop(ctx, opts, filePath)
 
 		time.Sleep(*opts.DelayBetweenExecutions)
 	}
 }
 
-func addCommandOutputWithoutLoop(opts AddCommandOutputOptions, outputPath string) {
+func addCommandOutputWithoutLoop(ctx context.Context, opts AddCommandOutputOptions, outputPath string) {
 	start := time.Now()
 
 	content := fmt.Sprintf("# Executed command: %s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
 	content = fmt.Sprintf("%s\n# Started at: %s", content, time.Now().Format(time.RFC3339))
 
-	cmd := exec.Command(opts.CommandName, opts.CommandArgs...)
+	cmd := exec.CommandContext(ctx, opts.CommandName, opts.CommandArgs...)
 	log.Debug().Msgf("Executing: %s", cmd.String())
 	if opts.Stdin != nil {
 		cmd.Stdin = opts.Stdin
