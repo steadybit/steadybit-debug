@@ -6,14 +6,10 @@ package main
 import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/steadybit/steadybit-debug/agent"
 	"github.com/steadybit/steadybit-debug/config"
-	"github.com/steadybit/steadybit-debug/extensions"
-	"github.com/steadybit/steadybit-debug/k8s"
+	"github.com/steadybit/steadybit-debug/debugrun"
 	"github.com/steadybit/steadybit-debug/output"
-	"github.com/steadybit/steadybit-debug/platform"
 	"os"
-	"sync"
 )
 
 func main() {
@@ -28,7 +24,7 @@ func main() {
 		Content:    cfg,
 		OutputPath: []string{"debugging_config.yaml"},
 	})
-	GatherInformation(&cfg)
+	debugrun.GatherInformation(&cfg)
 	output.ZipOutputDirectory(&cfg)
 
 	if !cfg.NoCleanup {
@@ -37,36 +33,4 @@ func main() {
 			log.Warn().Err(err).Msgf("Failed to remove output directory '%s' after completion", cfg.OutputPath)
 		}
 	}
-}
-
-func GatherInformation(cfg *config.Config) {
-	var wg sync.WaitGroup
-	wg.Add(5)
-
-	go func() {
-		defer wg.Done()
-		platform.AddPlatformDebuggingInformation(cfg)
-	}()
-
-	go func() {
-		defer wg.Done()
-		platform.AddPlatformPortSplitterDebuggingInformation(cfg)
-	}()
-
-	go func() {
-		defer wg.Done()
-		agent.AddAgentDebuggingInformation(cfg)
-	}()
-
-	go func() {
-		defer wg.Done()
-		k8s.AddKubernetesNodesInformation(cfg)
-	}()
-
-	go func() {
-		defer wg.Done()
-		extensions.AddExtensionDebuggingInformation(cfg)
-	}()
-
-	wg.Wait()
 }
