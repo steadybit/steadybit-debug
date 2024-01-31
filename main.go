@@ -28,7 +28,7 @@ func main() {
 		Content:    cfg,
 		OutputPath: []string{"debugging_config.yaml"},
 	})
-	gatherInformation(&cfg)
+	GatherInformation(&cfg)
 	output.ZipOutputDirectory(&cfg)
 
 	if !cfg.NoCleanup {
@@ -39,7 +39,7 @@ func main() {
 	}
 }
 
-func gatherInformation(cfg *config.Config) {
+func GatherInformation(cfg *config.Config) {
 	var wg sync.WaitGroup
 	wg.Add(5)
 
