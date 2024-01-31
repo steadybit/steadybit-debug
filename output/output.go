@@ -27,7 +27,7 @@ func AddOutputDirectory(cfg *config.Config) {
 	log.Info().Msgf("Debugging output will be collected at %s%s", cfg.OutputPath, hint)
 }
 
-func ZipOutputDirectory(cfg *config.Config) {
+func ZipOutputDirectory(cfg *config.Config) string {
 	targetPath := fmt.Sprintf("%s.tar.gz", cfg.OutputPath)
 	cwd := filepath.Join(cfg.OutputPath, "..")
 	// Use relative paths for the last argument to `tar` so that the paths within tar are nice and short
@@ -40,6 +40,7 @@ func ZipOutputDirectory(cfg *config.Config) {
 		os.Exit(1)
 	}
 	log.Info().Msgf("Debugging output collected at: %s", targetPath)
+	return targetPath
 }
 
 func WriteToFile(path string, content []byte) {
