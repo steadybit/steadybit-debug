@@ -24,16 +24,6 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 
 	go func() {
 		defer wg.Done()
-		daemonSet, err := k8s.FindDaemonSet(cfg, cfg.Agent.Namespace, cfg.Agent.DaemonSet)
-		if err != nil {
-			log.Warn().Msgf("Failed to find agent daemon set '%s' in '%s': %s", cfg.Agent.DaemonSet, cfg.Agent.Namespace, err)
-		} else {
-			addAgentDebuggingData(cfg, filepath.Join(cfg.OutputPath, "agent"), daemonSet.Namespace, daemonSet.Name, "daemonset", daemonSet.Spec.Selector)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
 		statefulSet, err := k8s.FindStatefulSet(cfg, cfg.Outpost.Namespace, cfg.Outpost.StatefulSet)
 		if err != nil {
 			log.Warn().Msgf("Failed to find outpost stateful set '%s' in '%s': %s", cfg.Outpost.StatefulSet, cfg.Outpost.Namespace, err)

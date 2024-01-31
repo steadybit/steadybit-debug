@@ -20,7 +20,6 @@ type Config struct {
 	Kubernetes           KubernetesConfig           `yaml:"kubernetes"`
 	Platform             PlatformConfig             `yaml:"platform"`
 	PlatformPortSplitter PlatformportSplitterConfig `yaml:"platform-port-splitter"`
-	Agent                AgentConfig                `yaml:"agent"`
 	Outpost              OutpostConfig              `yaml:"outpost"`
 	Tls                  Tls                        `yaml:"tls"`
 }
@@ -34,11 +33,6 @@ type PlatformConfig struct {
 type PlatformportSplitterConfig struct {
 	Deployment string `yaml:"deployment" long:"platform-splitter-deployment" description:"Kubernetes deployment name of the Steadybit platform splitter"`
 	Namespace  string `yaml:"namespace" long:"platform-splitter-namespace" description:"Kubernetes namespace name of the Steadybit platform splitter"`
-}
-
-type AgentConfig struct {
-	DaemonSet string `yaml:"daemonSet" long:"agent-daemon-set" description:"Kubernetes daemon set name of the Steadybit agent"`
-	Namespace string `yaml:"namespace" long:"agent-namespace" description:"Kubernetes namespace name of the Steadybit agent"`
 }
 
 type OutpostConfig struct {
@@ -93,10 +87,6 @@ func newConfig() Config {
 		PlatformPortSplitter: PlatformportSplitterConfig{
 			Namespace:  "steadybit-platform",
 			Deployment: "platform-port-splitter",
-		},
-		Agent: AgentConfig{
-			Namespace: "steadybit-agent",
-			DaemonSet: "steadybit-agent",
 		},
 		Outpost: OutpostConfig{
 			Namespace:       "steadybit-outpost",
