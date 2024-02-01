@@ -4,14 +4,18 @@
 package config
 
 import (
+	"errors"
+	"flag"
 	"github.com/jessevdk/go-flags"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Config struct {
@@ -53,12 +57,44 @@ type KubernetesConfig struct {
 }
 
 func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigPath)
+	config, err := rest.InClusterConfig()
+	if err == nil {
+		log.Info().Msgf("Steadybit-Debug is running inside a cluster, config found")
+	} else if errors.Is(err, rest.ErrNotInCluster) {
+		log.Debug().Msgf("Steadybit-Debug is not running inside a cluster, try local .kube config")
+		var kubeconfig *string
+		// use the current context in kubeconfig
+		if home := homedir.HomeDir(); home != "" {
+			config, err = clientcmd.BuildConfigFromFlags("", c.KubeConfigPath)
+		} else {
+			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+			flag.Parse()
+			config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		}
+	}
+
 	if err != nil {
+		log.Error().Err(err).Msgf("Could not find kubernetes config")
 		return nil, err
 	}
 
-	return kubernetes.NewForConfig(config)
+	config.UserAgent = "steadybit-debug"
+	config.Timeout = time.Second * 10
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Error().Err(err).Msgf("Could not create kubernetes client")
+		return nil, err
+	}
+
+	info, err := clientset.ServerVersion()
+	if err != nil {
+		log.Error().Err(err).Msgf("Could not fetch server version.")
+		return nil, err
+	}
+
+	log.Info().Msgf("Cluster connected! Kubernetes Server Version %+v", info)
+
+	return clientset, nil
 }
 
 func newConfig() Config {
