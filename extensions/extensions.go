@@ -27,6 +27,10 @@ func AddExtensionDebuggingInformation(cfg *config.Config) {
 		log.Warn().Msgf("Failed to find namespaces: %s", err)
 		return
 	}
+	if len(namespaces) == 0 {
+		log.Warn().Msgf("No namespaces found")
+		return
+	}
 	for _, namespace := range namespaces {
 		wg.Add(1)
 		go func(namespace string) {
@@ -88,7 +92,7 @@ func forEachPod(cfg *config.Config, kind string, namespace string, name string, 
 		k8s.AddConfig(cfg, filepath.Join(pathForPod, "config.yml"), "pod", pod.Namespace, pod.Name)
 		k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
 		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
-		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name)
+		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name,3)
 
 		ports := portsFn(pod)
 		for _, port := range ports {

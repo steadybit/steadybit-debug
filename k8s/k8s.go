@@ -62,6 +62,7 @@ func FindStatefulSet(cfg *config.Config, namespace string, name string) (*appsv1
 }
 
 func AddDescription(config *config.Config, outputPath string, kind string, namespace string, name string) {
+	log.Debug().Msgf("Adding description for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:      config,
 		CommandName: "kubectl",
@@ -71,24 +72,29 @@ func AddDescription(config *config.Config, outputPath string, kind string, names
 }
 
 func AddHttpConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
+	log.Debug().Msgf("Adding http connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", url}, nil)
 }
 
 func AddTracerouteConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, host string) {
+	log.Debug().Msgf("Adding traceroute connection test for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	addWithEphemeralContainer(ctx, config, outputPath, namespace, name, containerName, config.Outpost.TracerouteImage, "traceroute", []string{host}, nil)
 }
 
 func AddWebsocketCurlHttp1ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
+	log.Debug().Msgf("Adding curl http1 connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v", "--http1.1"}, nil)
 }
 
 func AddWebsocketCurlHttp2ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
+	log.Debug().Msgf("Adding curl http2 connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v"}, nil)
 }
 
 func AddWebsocketWebsocatConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
+	log.Debug().Msgf("Adding websocat connection test for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	wsUrl := strings.ReplaceAll(url, "https://", "wss://")
 	wsUrl = strings.ReplaceAll(wsUrl, "http://", "ws://")
 	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.WebsocatImage, "websocat", []string{wsUrl + "/ws", "-v"}, strings.NewReader(" "))
@@ -207,6 +213,7 @@ func ForEachNode(cfg *config.Config, fn func(node *v1.Node)) {
 }
 
 func AddLogs(cfg *config.Config, path string, namespace string, name string) {
+	log.Debug().Msgf("Adding logs for '%s' in namespace '%s' to '%s'", name, namespace, path)
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:      cfg,
 		CommandName: "kubectl",
@@ -216,6 +223,7 @@ func AddLogs(cfg *config.Config, path string, namespace string, name string) {
 }
 
 func AddPreviousLogs(cfg *config.Config, path string, namespace string, name string) {
+	log.Debug().Msgf("Adding previous logs for '%s' in namespace '%s' to '%s'", name, namespace, path)
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:      cfg,
 		CommandName: "kubectl",
@@ -225,14 +233,15 @@ func AddPreviousLogs(cfg *config.Config, path string, namespace string, name str
 }
 
 // AddResourceUsage path must include '%d' to replace the execution number within the file path
-func AddResourceUsage(cfg *config.Config, path string, namespace string, name string) {
+func AddResourceUsage(cfg *config.Config, path string, namespace string, name string, executions int) {
+	log.Debug().Msgf("Adding resource usage for '%s' in namespace '%s' to '%s'", name, namespace, path)
 	delay := time.Millisecond * 500
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:                 cfg,
 		CommandName:            "kubectl",
 		CommandArgs:            []string{"top", "pod", "-n", namespace, "--containers", name},
 		OutputPath:             path,
-		Executions:             10,
+		Executions:             executions,
 		DelayBetweenExecutions: &delay,
 	})
 }
@@ -275,6 +284,7 @@ type AddDownloadOutputOptions struct {
 }
 
 func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) {
+	log.Debug().Msgf("Adding multiple http endpoints for '%s' in namespace '%s'", options.PodConfig.PodName, options.PodConfig.PodNamespace)
 	forwardingHostWithPort, cmd, err := PreparePortforwarding(PodConfig{
 		PodNamespace: options.PodConfig.PodNamespace,
 		PodName:      options.PodConfig.PodName,
@@ -322,6 +332,7 @@ type Connection struct {
 }
 
 func GetExtensionConnections(sharedPort int, podConfig PodConfig, cfg *config.Config) []Connection {
+	log.Debug().Msgf("Getting extension connections for '%s' in namespace '%s'", podConfig.PodName, podConfig.PodNamespace)
 	forwardingHostWithPort, cmd, err := PreparePortforwarding(podConfig, sharedPort)
 	if err != nil {
 		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
@@ -396,6 +407,7 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 }
 
 func DownloadFromPod(options AddDownloadOutputOptions) {
+	log.Debug().Msgf("Downloading from '%s' in namespace '%s'", options.PodName, options.PodNamespace)
 	downloadUrl, err := url.Parse(options.Url)
 	if err != nil {
 		log.Error().Msgf("Failed to parse URL '%s'", options.Url)
