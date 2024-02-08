@@ -73,31 +73,31 @@ func AddDescription(config *config.Config, outputPath string, kind string, names
 
 func AddHttpConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
 	log.Debug().Msgf("Adding http connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
-	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", url}, nil)
+	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Agent.CurlImage, "curl", []string{"-v", url}, nil)
 }
 
 func AddTracerouteConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, host string) {
 	log.Debug().Msgf("Adding traceroute connection test for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	addWithEphemeralContainer(ctx, config, outputPath, namespace, name, containerName, config.Outpost.TracerouteImage, "traceroute", []string{host}, nil)
+	addWithEphemeralContainer(ctx, config, outputPath, namespace, name, containerName, config.Agent.TracerouteImage, "traceroute", []string{host}, nil)
 }
 
 func AddWebsocketCurlHttp1ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
 	log.Debug().Msgf("Adding curl http1 connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
-	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v", "--http1.1"}, nil)
+	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Agent.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v", "--http1.1"}, nil)
 }
 
 func AddWebsocketCurlHttp2ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
 	log.Debug().Msgf("Adding curl http2 connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
-	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v"}, nil)
+	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Agent.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v"}, nil)
 }
 
 func AddWebsocketWebsocatConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
 	log.Debug().Msgf("Adding websocat connection test for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	wsUrl := strings.ReplaceAll(url, "https://", "wss://")
 	wsUrl = strings.ReplaceAll(wsUrl, "http://", "ws://")
-	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Outpost.WebsocatImage, "websocat", []string{wsUrl + "/ws", "-v"}, strings.NewReader(" "))
+	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Agent.WebsocatImage, "websocat", []string{wsUrl + "/ws", "-v"}, strings.NewReader(" "))
 }
 
 func addWithEphemeralContainer(ctx context.Context, config *config.Config, outputPath string, namespace string, name string, containerName string, imageName string, command string, args []string, stdin io.Reader) {

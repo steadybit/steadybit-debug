@@ -24,11 +24,11 @@ func AddAgentDebuggingInformation(cfg *config.Config) {
 
 	go func() {
 		defer wg.Done()
-		statefulSet, err := k8s.FindStatefulSet(cfg, cfg.Outpost.Namespace, cfg.Outpost.StatefulSet)
+		statefulSet, err := k8s.FindStatefulSet(cfg, cfg.Agent.Namespace, cfg.Agent.StatefulSet)
 		if err != nil {
-			log.Warn().Msgf("Failed to find outpost stateful set '%s' in '%s': %s", cfg.Outpost.StatefulSet, cfg.Outpost.Namespace, err)
+			log.Warn().Msgf("Failed to find agent stateful set '%s' in '%s': %s", cfg.Agent.StatefulSet, cfg.Agent.Namespace, err)
 		} else {
-			addAgentDebuggingData(cfg, filepath.Join(cfg.OutputPath, "outpost"), statefulSet.Namespace, statefulSet.Name, "statefulset", statefulSet.Spec.Selector)
+			addAgentDebuggingData(cfg, filepath.Join(cfg.OutputPath, "agent"), statefulSet.Namespace, statefulSet.Name, "statefulset", statefulSet.Spec.Selector)
 		}
 	}()
 
@@ -93,9 +93,6 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 						OutputPath: filepath.Join(pathForPod, "info.yml"),
 						Url:        fmt.Sprintf("http://localhost:%d/info", port),
 					}, {
-						OutputPath: filepath.Join(pathForPod, "self_test.yml"),
-						Url:        fmt.Sprintf("http://localhost:%d/self-test", port),
-					}, {
 						OutputPath: filepath.Join(pathForPod, "discovery_info.yml"),
 						Url:        fmt.Sprintf("http://localhost:%d/discovery/info", port),
 					}, {
@@ -104,12 +101,6 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 					}, {
 						OutputPath: filepath.Join(pathForPod, "target_stats.yml"),
 						Url:        fmt.Sprintf("http://localhost:%d/discovery/targets/stats", port),
-					}, {
-						OutputPath: filepath.Join(pathForPod, "connections.yml"),
-						Url:        fmt.Sprintf("http://localhost:%d/discovery/connections", port),
-					}, {
-						OutputPath: filepath.Join(pathForPod, "connection_stats.yml"),
-						Url:        fmt.Sprintf("http://localhost:%d/discovery/connections/stats", port),
 					}, {
 						OutputPath: filepath.Join(pathForPod, "target_type_description.yml"),
 						Url:        fmt.Sprintf("http://localhost:%d/targetType/description", port),
