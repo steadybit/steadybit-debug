@@ -9,7 +9,9 @@ import (
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/debugrun"
 	"github.com/steadybit/steadybit-debug/output"
+	"io"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -18,6 +20,7 @@ func main() {
 
 	cfg := config.GetConfig()
 	output.AddOutputDirectory(&cfg)
+	addLoggingToFile(&cfg)
 
 	output.AddJsonOutput(output.AddJsonOutputOptions{
 		Config:     &cfg,
@@ -33,4 +36,30 @@ func main() {
 			log.Warn().Err(err).Msgf("Failed to remove output directory '%s' after completion", cfg.OutputPath)
 		}
 	}
+}
+
+func addLoggingToFile(cfg *config.Config) *os.File {
+	file, err := os.OpenFile(
+		filepath.Join(cfg.OutputPath, "log.txt"),
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0664,
+	)
+
+	writers := []io.Writer{
+		&zerolog.FilteredLevelWriter{
+			Writer: zerolog.LevelWriterAdapter{zerolog.ConsoleWriter{Out: os.Stderr}},
+			Level:  zerolog.InfoLevel,
+		},
+		&zerolog.FilteredLevelWriter{
+			Writer: zerolog.LevelWriterAdapter{file},
+			Level:  zerolog.DebugLevel,
+		},
+	}
+	writer := zerolog.MultiLevelWriter(writers...)
+	log.Logger = zerolog.New(writer).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+
+	if err != nil {
+		panic(err)
+	}
+	return file
 }

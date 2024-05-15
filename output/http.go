@@ -21,12 +21,13 @@ import (
 )
 
 type AddHttpOutputOptions struct {
-	Config     *config.Config
-	Method     string
-	URL        url.URL
-	OutputPath string
-	UseHttps   bool
-	FormatJson bool
+	Config           *config.Config
+	Method           string
+	URL              url.URL
+	OutputPath       string
+	UseHttps         bool
+	FormatJson       bool
+	ExecutionContext string
 }
 
 type HttpOptions struct {
@@ -53,6 +54,7 @@ func AddHttpOutput(opts AddHttpOutputOptions) {
 	})
 	if err != nil {
 		content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)
+		log.Error().Str("context", opts.ExecutionContext).Str("cmd", fmt.Sprintf("%s %s", opts.Method, opts.URL.String())).Msgf("Error executing command")
 	}
 	if strings.Contains(string(out), "Client sent an HTTP request to an HTTPS server") {
 		opts.UseHttps = true
@@ -65,6 +67,7 @@ func AddHttpOutput(opts AddHttpOutputOptions) {
 		})
 		if err != nil {
 			content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)
+			log.Error().Str("context", opts.ExecutionContext).Str("cmd", fmt.Sprintf("%s %s", opts.Method, opts.URL.String())).Msgf("Error executing command")
 		}
 	}
 	content = fmt.Sprintf("%s\n\n%s", content, out)
@@ -138,7 +141,7 @@ func doHttp(options HttpOptions) ([]byte, error) {
 	response, err := client.Do(req)
 	defer closeResponse(response)
 	if err != nil {
-		log.Err(err).Msgf("Failed to execute request")
+		log.Debug().Err(err).Msgf("Failed to execute request")
 		return nil, err
 	}
 	if response.StatusCode != http.StatusOK {
@@ -158,7 +161,7 @@ func closeResponse(response *http.Response) {
 	func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			log.Error().Msgf("Failed to close response body")
+			log.Debug().Msgf("Failed to close response body")
 			return
 		}
 	}(response.Body)

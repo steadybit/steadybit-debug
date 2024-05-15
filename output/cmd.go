@@ -19,6 +19,8 @@ type AddCommandOutputOptions struct {
 	Executions             int
 	DelayBetweenExecutions *time.Duration
 	Stdin                  io.Reader
+	ExecutionContext       string
+	LogError               bool
 }
 
 // AddCommandOutput opts.OutputPath must include a %d to replace the execution number when opts.Executions > 1
@@ -59,6 +61,12 @@ func addCommandOutputWithoutLoop(ctx context.Context, opts AddCommandOutputOptio
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		content = fmt.Sprintf("%s\n# Resulted in error: %s", content, err)
+		if opts.LogError {
+			log.Error().Str("context", opts.ExecutionContext).Str("cmd", cmd.String()).Msgf("Error executing command")
+		} else {
+			log.Debug().Str("context", opts.ExecutionContext).Str("cmd", cmd.String()).Msgf("Error executing command")
+		}
+
 	}
 	content = fmt.Sprintf("%s\n\n%s", content, out)
 

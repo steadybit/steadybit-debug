@@ -37,18 +37,6 @@ func FindDeployment(cfg *config.Config, namespace string, name string) (*appsv1.
 		Get(context.Background(), name, metav1.GetOptions{})
 }
 
-func FindDaemonSet(cfg *config.Config, namespace string, name string) (*appsv1.DaemonSet, error) {
-	client, err := cfg.Kubernetes.Client()
-	if err != nil {
-		return nil, err
-	}
-
-	return client.
-		AppsV1().
-		DaemonSets(namespace).
-		Get(context.Background(), name, metav1.GetOptions{})
-}
-
 func FindStatefulSet(cfg *config.Config, namespace string, name string) (*appsv1.StatefulSet, error) {
 	client, err := cfg.Kubernetes.Client()
 	if err != nil {
@@ -64,10 +52,12 @@ func FindStatefulSet(cfg *config.Config, namespace string, name string) (*appsv1
 func AddDescription(config *config.Config, outputPath string, kind string, namespace string, name string) {
 	log.Debug().Msgf("Adding description for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
-		Config:      config,
-		CommandName: "kubectl",
-		CommandArgs: []string{"describe", kind, "-n", namespace, name},
-		OutputPath:  outputPath,
+		Config:           config,
+		CommandName:      "kubectl",
+		CommandArgs:      []string{"describe", kind, "-n", namespace, name},
+		OutputPath:       outputPath,
+		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
+		LogError:         true,
 	})
 }
 
@@ -104,19 +94,22 @@ func addWithEphemeralContainer(ctx context.Context, config *config.Config, outpu
 	commandArgs := []string{"debug", "-it", name, "-n", namespace, "--target", containerName, "--image", imageName, "-c", "steadybit-debug-" + strconv.Itoa(int(time.Now().Unix())), "--", command}
 	commandArgs = append(commandArgs, args...)
 	output.AddCommandOutput(ctx, output.AddCommandOutputOptions{
-		Config:      config,
-		CommandName: "kubectl",
-		CommandArgs: commandArgs,
-		OutputPath:  outputPath,
+		Config:           config,
+		CommandName:      "kubectl",
+		CommandArgs:      commandArgs,
+		OutputPath:       outputPath,
+		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
 	})
 }
 
 func AddConfig(config *config.Config, outputPath string, kind string, namespace string, name string) {
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
-		Config:      config,
-		CommandName: "kubectl",
-		CommandArgs: []string{"get", kind, "-n", namespace, "-o", "yaml", name},
-		OutputPath:  outputPath,
+		Config:           config,
+		CommandName:      "kubectl",
+		CommandArgs:      []string{"get", kind, "-n", namespace, "-o", "yaml", name},
+		OutputPath:       outputPath,
+		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
+		LogError:         true,
 	})
 }
 
@@ -124,7 +117,7 @@ func AddConfig(config *config.Config, outputPath string, kind string, namespace 
 func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSelector, fn func(pod *v1.Pod, idx int)) {
 	podList, err := findPods(cfg, namespace, selector)
 	if err != nil {
-		log.Info().Msgf("Failed to find pods in namespace '%s' for selector '%s'. Got error: %s", namespace, selector.String(), err)
+		log.Debug().Msgf("Failed to find pods in namespace '%s' for selector '%s'. Got error: %s", namespace, selector.String(), err)
 		return
 	}
 
@@ -135,7 +128,7 @@ func ForEachPod(cfg *config.Config, namespace string, selector *metav1.LabelSele
 func ForEachPodViaMapSelector(cfg *config.Config, namespace string, selectorMap map[string]string, fn func(pod *v1.Pod, idx int)) {
 	podList, err := findPodsBySelectorMap(cfg, namespace, selectorMap)
 	if err != nil {
-		log.Info().Msgf("Failed to find pods in namespace '%s' for selector '%s'. Got error: %s", namespace, selectorMap, err)
+		log.Debug().Msgf("Failed to find pods in namespace '%s' for selector '%s'. Got error: %s", namespace, selectorMap, err)
 		return
 	}
 
@@ -186,7 +179,7 @@ func findPodsBySelectorMap(cfg *config.Config, namespace string, selectorMap map
 func ForEachNode(cfg *config.Config, fn func(node *v1.Node)) {
 	client, err := cfg.Kubernetes.Client()
 	if err != nil {
-		log.Info().Msgf("Failed to create Kubernetes client while trying to find node information. Got error: %s", err)
+		log.Debug().Msgf("Failed to create Kubernetes client while trying to find node information. Got error: %s", err)
 		return
 	}
 
@@ -195,7 +188,7 @@ func ForEachNode(cfg *config.Config, fn func(node *v1.Node)) {
 		Nodes().
 		List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		log.Info().Msgf("Failed to find nodes. Got error: %s", err)
+		log.Debug().Msgf("Failed to find nodes. Got error: %s", err)
 		return
 	}
 
@@ -215,20 +208,23 @@ func ForEachNode(cfg *config.Config, fn func(node *v1.Node)) {
 func AddLogs(cfg *config.Config, path string, namespace string, name string) {
 	log.Debug().Msgf("Adding logs for '%s' in namespace '%s' to '%s'", name, namespace, path)
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
-		Config:      cfg,
-		CommandName: "kubectl",
-		CommandArgs: []string{"logs", "-n", namespace, "--all-containers", name},
-		OutputPath:  path,
+		Config:           cfg,
+		CommandName:      "kubectl",
+		CommandArgs:      []string{"logs", "-n", namespace, "--all-containers", name},
+		OutputPath:       path,
+		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
+		LogError:         true,
 	})
 }
 
 func AddPreviousLogs(cfg *config.Config, path string, namespace string, name string) {
 	log.Debug().Msgf("Adding previous logs for '%s' in namespace '%s' to '%s'", name, namespace, path)
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
-		Config:      cfg,
-		CommandName: "kubectl",
-		CommandArgs: []string{"logs", "-n", namespace, "--previous", "--all-containers", name},
-		OutputPath:  path,
+		Config:           cfg,
+		CommandName:      "kubectl",
+		CommandArgs:      []string{"logs", "-n", namespace, "--previous", "--all-containers", name},
+		OutputPath:       path,
+		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
 	})
 }
 
@@ -243,6 +239,7 @@ func AddResourceUsage(cfg *config.Config, path string, namespace string, name st
 		OutputPath:             path,
 		Executions:             executions,
 		DelayBetweenExecutions: &delay,
+		ExecutionContext:       fmt.Sprintf("%s/%s", namespace, name),
 	})
 }
 
@@ -291,7 +288,7 @@ func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) 
 		Config:       options.PodConfig.Config,
 	}, options.SharedPort)
 	if err != nil {
-		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
+		log.Debug().Msgf("Failed to prepare port forwarding. Got error: %s", err)
 		return
 	}
 
@@ -306,7 +303,7 @@ func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) 
 			defer wg.Done()
 			podUrl, err := url.Parse(endpoint.Url)
 			if err != nil {
-				log.Error().Msgf("Failed to parse URL '%s'", endpoint.Url)
+				log.Debug().Msgf("Failed to parse URL '%s'", endpoint.Url)
 				return
 			}
 			podUrl.Host = forwardingHostWithPort
@@ -318,6 +315,7 @@ func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) 
 				DelayBetweenExecutions: endpoint.DelayBetweenExecutions,
 				CommandName:            "curl",
 				CommandArgs:            []string{"-s", podUrl.String()},
+				ExecutionContext:       fmt.Sprintf("%s/%s", options.PodConfig.PodNamespace, options.PodConfig.PodName),
 			})
 		}(endpoint)
 	}
@@ -335,7 +333,7 @@ func GetExtensionConnections(sharedPort int, podConfig PodConfig, cfg *config.Co
 	log.Debug().Msgf("Getting extension connections for '%s' in namespace '%s'", podConfig.PodName, podConfig.PodNamespace)
 	forwardingHostWithPort, cmd, err := PreparePortforwarding(podConfig, sharedPort)
 	if err != nil {
-		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
+		log.Debug().Msgf("Failed to prepare port forwarding. Got error: %s", err)
 		return nil
 	}
 
@@ -345,11 +343,11 @@ func GetExtensionConnections(sharedPort int, podConfig PodConfig, cfg *config.Co
 
 	podUrl, err := url.Parse(fmt.Sprintf("http://localhost:%d/extension/connections", sharedPort))
 	if err != nil {
-		log.Error().Msgf("Failed to parse URL '%s'", forwardingHostWithPort)
+		log.Debug().Msgf("Failed to parse URL '%s'", forwardingHostWithPort)
 		return nil
 	}
 	podUrl.Host = forwardingHostWithPort
-	log.Info().Msgf("Using URL '%s' for extension connection test", podUrl.String())
+	log.Debug().Msgf("Using URL '%s' for extension connection test", podUrl.String())
 	body, err := output.DoHttp(output.HttpOptions{
 		Config:     cfg,
 		Method:     "GET",
@@ -357,13 +355,13 @@ func GetExtensionConnections(sharedPort int, podConfig PodConfig, cfg *config.Co
 		FormatJson: false,
 	})
 	if err != nil {
-		log.Error().Msgf("Failed to read response body")
+		log.Debug().Msgf("Failed to read response body")
 		return nil
 	}
 	var connections []Connection
 	err = json.Unmarshal(body, &connections)
 	if err != nil {
-		log.Error().Msgf("Failed to unmarshal response body")
+		log.Debug().Msgf("Failed to unmarshal response body")
 		return nil
 	}
 	return connections
@@ -372,7 +370,7 @@ func GetExtensionConnections(sharedPort int, podConfig PodConfig, cfg *config.Co
 func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 	podUrl, err := url.Parse(options.Url)
 	if err != nil {
-		log.Error().Msgf("Failed to parse URL '%s'", options.Url)
+		log.Debug().Msgf("Failed to parse URL '%s'", options.Url)
 		return
 	}
 	port, _ := strconv.Atoi(podUrl.Port())
@@ -382,7 +380,7 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 		Config:       options.Config,
 	}, port)
 	if err != nil {
-		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
+		log.Debug().Msgf("Failed to prepare port forwarding. Got error: %s", err)
 		return
 	}
 
@@ -403,6 +401,7 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 		OutputPath:             options.OutputPath,
 		Executions:             options.Executions,
 		DelayBetweenExecutions: options.DelayBetweenExecutions,
+		ExecutionContext:       fmt.Sprintf("%s/%s", options.PodNamespace, options.PodName),
 	})
 }
 
@@ -410,7 +409,7 @@ func DownloadFromPod(options AddDownloadOutputOptions) {
 	log.Debug().Msgf("Downloading from '%s' in namespace '%s'", options.PodName, options.PodNamespace)
 	downloadUrl, err := url.Parse(options.Url)
 	if err != nil {
-		log.Error().Msgf("Failed to parse URL '%s'", options.Url)
+		log.Debug().Msgf("Failed to parse URL '%s'", options.Url)
 		return
 	}
 	port, _ := strconv.Atoi(downloadUrl.Port())
@@ -420,7 +419,7 @@ func DownloadFromPod(options AddDownloadOutputOptions) {
 		Config:       options.Config,
 	}, port)
 	if err != nil {
-		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
+		log.Debug().Msgf("Failed to prepare port forwarding. Got error: %s", err)
 		return
 	}
 
@@ -444,7 +443,7 @@ func DownloadFromPod(options AddDownloadOutputOptions) {
 func KillProcess(cmd *exec.Cmd, options PodConfig) {
 	err := cmd.Process.Kill()
 	if err != nil {
-		log.Error().Msgf("Failed to stop port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
+		log.Debug().Msgf("Failed to stop port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
 		return
 	}
 }
@@ -456,7 +455,7 @@ func PreparePortforwarding(options PodConfig, port int) (string, *exec.Cmd, erro
 	cmdOut, _ := cmd.StdoutPipe()
 	err := cmd.Start()
 	if err != nil {
-		log.Error().Msgf("Failed to port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
+		log.Debug().Msgf("Failed to port-forward for '%s' in namespace '%s", options.PodName, options.PodNamespace)
 		return "", nil, err
 	}
 

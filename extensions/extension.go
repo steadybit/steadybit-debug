@@ -44,7 +44,7 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 
 	podUrl, err := url.Parse(baseUrl)
 	if err != nil {
-		log.Error().Msgf("Failed to parse URL '%s'", baseUrl)
+		log.Debug().Msgf("Failed to parse URL '%s'", baseUrl)
 		return
 	}
 	forwardingHostWithPort, cmd, err := k8s.PreparePortforwarding(k8s.PodConfig{
@@ -53,7 +53,7 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 		Config:       options.Config,
 	}, options.Port)
 	if err != nil {
-		log.Error().Msgf("Failed to prepare port forwarding. Got error: %s", err)
+		log.Debug().Msgf("Failed to prepare port forwarding. Got error: %s", err)
 		return
 	}
 
@@ -75,9 +75,9 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "remote error: tls: bad certificate") {
-			log.Error().Msgf("Please provide proper TLS certificates for %s ", options.PodNamespace+"/"+options.PodName)
+			log.Debug().Msgf("Please provide proper TLS certificates for %s ", options.PodNamespace+"/"+options.PodName)
 		}
-		log.Error().Msgf("Failed to get '%s'", podUrl.String())
+		log.Debug().Msgf("Failed to get '%s'", podUrl.String())
 		return
 	}
 
@@ -120,12 +120,13 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 		go func() {
 			defer wg.Done()
 			output.AddHttpOutput(output.AddHttpOutputOptions{
-				Config:     options.Config,
-				URL:        *fullUrl,
-				Method:     urlToCurl.Method,
-				OutputPath: outputPath,
-				FormatJson: true,
-				UseHttps:   options.UseHttps,
+				Config:           options.Config,
+				URL:              *fullUrl,
+				Method:           urlToCurl.Method,
+				OutputPath:       outputPath,
+				FormatJson:       true,
+				UseHttps:         options.UseHttps,
+				ExecutionContext: fmt.Sprintf("%s/%s", options.PodNamespace, options.PodName),
 			})
 		}()
 	}
@@ -149,13 +150,14 @@ func findDiscoveredTargetsUrl(cfg *config.Config, method discovery_kit_api.ReadH
 		FormatJson: false,
 	})
 	if err != nil {
-		log.Error().Msgf("Failed to read response body")
+		log.Debug().Msgf("Failed to read response body")
 		return
 	}
 
 	discoveryDescriptionResponse := discovery_kit_api.DiscoveryDescription{}
 	if err := json.Unmarshal(body, &discoveryDescriptionResponse); err != nil {
-		log.Err(err).Msgf("Failed to parse response body: %s", string(body))
+		log.Debug().Err(err).Msgf("Failed to parse response body: %s", string(body))
+		return
 	}
 
 	*urlsToCurlSlicePtr = append(*urlsToCurlSlicePtr, urlsToCurl{Method: string(discoveryDescriptionResponse.Discover.Method), Path: discoveryDescriptionResponse.Discover.Path})

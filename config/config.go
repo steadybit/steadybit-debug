@@ -68,7 +68,7 @@ type KubernetesConfig struct {
 func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
 	config, err := rest.InClusterConfig()
 	if err == nil {
-		log.Info().Msgf("Steadybit-Debug is running inside a cluster, config found")
+		log.Debug().Msgf("Steadybit-Debug is running inside a cluster, config found")
 	} else if errors.Is(err, rest.ErrNotInCluster) {
 		log.Debug().Msgf("Steadybit-Debug is not running inside a cluster, try local .kube config")
 		var kubeconfig *string
@@ -83,7 +83,7 @@ func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
 	}
 
 	if err != nil {
-		log.Error().Err(err).Msgf("Could not find kubernetes config")
+		log.Debug().Err(err).Msgf("Could not find kubernetes config")
 		return nil, err
 	}
 
@@ -91,17 +91,17 @@ func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
 	config.Timeout = time.Second * 10
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Error().Err(err).Msgf("Could not create kubernetes client")
+		log.Debug().Err(err).Msgf("Could not create kubernetes client")
 		return nil, err
 	}
 
 	info, err := clientset.ServerVersion()
 	if err != nil {
-		log.Error().Err(err).Msgf("Could not fetch server version.")
+		log.Debug().Err(err).Msgf("Could not fetch server version.")
 		return nil, err
 	}
 
-	log.Info().Msgf("Cluster connected! Kubernetes Server Version %+v", info)
+	log.Debug().Msgf("Cluster connected! Kubernetes Server Version %+v", info)
 
 	return clientset, nil
 }
