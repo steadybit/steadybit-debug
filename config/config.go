@@ -24,7 +24,6 @@ type Config struct {
 	Kubernetes           KubernetesConfig           `yaml:"kubernetes"`
 	Platform             PlatformConfig             `yaml:"platform"`
 	PlatformPortSplitter PlatformportSplitterConfig `yaml:"platform-port-splitter"`
-	Outpost              OutpostConfig              `yaml:"outpost"`
 	Agent                AgentConfig                `yaml:"agent"`
 	Tls                  Tls                        `yaml:"tls"`
 }
@@ -38,14 +37,6 @@ type PlatformConfig struct {
 type PlatformportSplitterConfig struct {
 	Deployment string `yaml:"deployment" long:"platform-splitter-deployment" description:"Kubernetes deployment name of the Steadybit platform splitter"`
 	Namespace  string `yaml:"namespace" long:"platform-splitter-namespace" description:"Kubernetes namespace name of the Steadybit platform splitter"`
-}
-
-type OutpostConfig struct {
-	StatefulSet     string `yaml:"statefulSet" long:"outpost-stateful-set" description:"Kubernetes stateful set name of the Steadybit outpost"`
-	Namespace       string `yaml:"namespace" long:"outpost-namespace" description:"Kubernetes namespace name of the Steadybit outpost"`
-	CurlImage       string `yaml:"curlImage" long:"outpost-curl-image" description:"Image to use for connection testing with curl installed"`
-	WebsocatImage   string `yaml:"websocatImage" long:"outpost-websocat-image" description:"Image to use for connection testing with websocat installed"`
-	TracerouteImage string `yaml:"tracerouteImage" long:"outpost-traceroute-image" description:"Image to use for connection testing with traceroute installed"`
 }
 
 type AgentConfig struct {
@@ -176,27 +167,6 @@ func GetConfig() Config {
 
 	_, err := flags.Parse(&config)
 	if err != nil {
-		os.Exit(1)
-	}
-
-	if config.Outpost.CurlImage != "" {
-		log.Error().Msg("'outpost-curl-image' config param has been removed. Please use 'agent-curl-image' instead.")
-		os.Exit(1)
-	}
-	if config.Outpost.Namespace != "" {
-		log.Error().Msg("'outpost-namespace' config param has been removed. Please use 'agent-namespace' instead.")
-		os.Exit(1)
-	}
-	if config.Outpost.StatefulSet != "" {
-		log.Error().Msg("'outpost-stateful-set' config param has been removed. Please use 'agent-outpost-stateful-set' instead.")
-		os.Exit(1)
-	}
-	if config.Outpost.WebsocatImage != "" {
-		log.Error().Msg("'outpost-websocat-image' config param has been removed. Please use 'agent-websocat-image' instead.")
-		os.Exit(1)
-	}
-	if config.Outpost.TracerouteImage != "" {
-		log.Error().Msg("'outpost-traceroute-image' config param has been removed. Please use 'agent-traceroute-image' instead.")
 		os.Exit(1)
 	}
 
