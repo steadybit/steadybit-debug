@@ -18,7 +18,8 @@ import (
 	"sync"
 )
 
-const ExtensionAutoDiscoveryAnnotation = "steadybit.com/extension-auto-discovery"
+const ExtensionAutoRegistrationAnnotation = "steadybit.com/extension-auto-registration"
+const ExtensionAutoRegistrationAnnotationDeprecated = "steadybit.com/extension-auto-discovery"
 
 func AddExtensionDebuggingInformation(cfg *config.Config) {
 	var wg sync.WaitGroup
@@ -112,17 +113,17 @@ func forEachPod(cfg *config.Config, kind string, namespace string, name string, 
 	})
 }
 
-type extensionAutoDiscoveryExtensionTls struct {
+type extensionAutoRegistrationExtensionTls struct {
 	Server any `json:"server"`
 	Client any `json:"client"`
 }
-type extensionAutoDiscoveryExtension struct {
-	Port int                                `json:"port"`
-	Tls  extensionAutoDiscoveryExtensionTls `json:"tls"`
+type extensionAutoRegistrationExtension struct {
+	Port int                                   `json:"port"`
+	Tls  extensionAutoRegistrationExtensionTls `json:"tls"`
 }
 
-type extensionAutoDiscovery struct {
-	Extensions []extensionAutoDiscoveryExtension `json:"extensions"`
+type extensionAutoRegistration struct {
+	Extensions []extensionAutoRegistrationExtension `json:"extensions"`
 }
 
 type podPort struct {
@@ -132,21 +133,24 @@ type podPort struct {
 
 func identifyPodPorts(pod *v1.Pod, annotations map[string]string) []podPort {
 	//try to find the port via annotations
-	extensionAutoDiscoveryString, ok := annotations[ExtensionAutoDiscoveryAnnotation]
+	extensionAutoRegistrationString, ok := annotations[ExtensionAutoRegistrationAnnotation]
+	if !ok {
+		extensionAutoRegistrationString, ok = annotations[ExtensionAutoRegistrationAnnotationDeprecated]
+	}
 	var defaultPort = podPort{
 		port: 8080,
 		tls:  false,
 	}
 
 	if ok {
-		extensionAutoDiscoveryStruct := extensionAutoDiscovery{}
-		err := json.Unmarshal([]byte(extensionAutoDiscoveryString), &extensionAutoDiscoveryStruct)
+		extensionAutoRegistrationStruct := extensionAutoRegistration{}
+		err := json.Unmarshal([]byte(extensionAutoRegistrationString), &extensionAutoRegistrationStruct)
 		if err != nil {
-			log.Warn().Msgf("Failed to parse extension auto discovery annotation: %s", err)
+			log.Warn().Msgf("Failed to parse extension auto registration annotation: %s", err)
 			return []podPort{defaultPort}
 		}
-		ret := make([]podPort, 0, len(extensionAutoDiscoveryStruct.Extensions))
-		for _, extension := range extensionAutoDiscoveryStruct.Extensions {
+		ret := make([]podPort, 0, len(extensionAutoRegistrationStruct.Extensions))
+		for _, extension := range extensionAutoRegistrationStruct.Extensions {
 			useHttps := extension.Tls.Client != nil || extension.Tls.Server != nil
 			ret = append(ret, podPort{
 				port: extension.Port,
@@ -203,7 +207,10 @@ func findExtensionsServices(cfg *config.Config, namespace string) ([]v1.Service,
 
 	result := make([]v1.Service, 0, len(listOfServices.Items))
 	for _, service := range listOfServices.Items {
-		_, ok := service.Annotations[ExtensionAutoDiscoveryAnnotation]
+		_, ok := service.Annotations[ExtensionAutoRegistrationAnnotation]
+		if !ok {
+			_, ok = service.Annotations[ExtensionAutoRegistrationAnnotationDeprecated]
+		}
 		if ok {
 			result = append(result, service)
 		}
@@ -225,7 +232,10 @@ func findExtensionDaemonsets(cfg *config.Config, namespace string) ([]appsv1.Dae
 
 	result := make([]appsv1.DaemonSet, 0, len(listOfDaemonsets.Items))
 	for _, daemonset := range listOfDaemonsets.Items {
-		_, ok := daemonset.Spec.Template.Annotations[ExtensionAutoDiscoveryAnnotation]
+		_, ok := daemonset.Spec.Template.Annotations[ExtensionAutoRegistrationAnnotation]
+		if !ok {
+			_, ok = daemonset.Spec.Template.Annotations[ExtensionAutoRegistrationAnnotationDeprecated]
+		}
 		if ok {
 			result = append(result, daemonset)
 		}
