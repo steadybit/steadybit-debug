@@ -131,7 +131,7 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 func identifyPodPort(pod *v1.Pod) int {
 	for _, container := range pod.Spec.Containers {
 		for _, env := range container.Env {
-			if strings.ToUpper(env.Name) == "STEADYBIT_HTTP_ENDPOINT_PORT" {
+			if strings.ToUpper(env.Name) == "SERVER_PORT" {
 				configuredPort, err := strconv.Atoi(env.Value)
 				if err == nil {
 					return configuredPort
