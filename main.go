@@ -47,11 +47,11 @@ func addLoggingToFile(cfg *config.Config) *os.File {
 
 	writers := []io.Writer{
 		&zerolog.FilteredLevelWriter{
-			Writer: zerolog.LevelWriterAdapter{zerolog.ConsoleWriter{Out: os.Stderr}},
+			Writer: zerolog.LevelWriterAdapter{Writer: zerolog.ConsoleWriter{Out: os.Stderr}},
 			Level:  zerolog.InfoLevel,
 		},
 		&zerolog.FilteredLevelWriter{
-			Writer: zerolog.LevelWriterAdapter{file},
+			Writer: zerolog.LevelWriterAdapter{Writer: file},
 			Level:  zerolog.DebugLevel,
 		},
 	}
