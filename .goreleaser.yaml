@@ -19,6 +19,19 @@ builds:
       - s390x
     goarm:
       - "7"
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: ppc64le
+      - goos: windows
+        goarch: s390x
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: ppc64le
+      - goos: darwin
+        goarch: s390x
     flags:
       - -trimpath
 archives:
