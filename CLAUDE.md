@@ -46,6 +46,21 @@ Concurrency is `sync.WaitGroup` everywhere; `k8s.ForEachPod`, `ForEachPodViaMapS
 their callback in parallel per item. Collectors never abort the run — failures are logged (usually at
 `Debug`/`Warn`) and the missing data simply doesn't appear in the archive.
 
+The fan-out is bounded by the semaphores in `limit/limit.go` (`--max-concurrency`), because every collected pod
+spawns a handful of `kubectl`/`curl` child processes and an unbounded fan-out over a large cluster is what made
+the tool exhaust the memory of the machine it runs on. Acquisition order is `Namespaces` → `Items`/`Nodes` (pod
+and node callbacks) → `Commands` (one per external execution); acquiring an earlier level while holding a later
+one deadlocks, and each level is acquired in exactly one place. Nodes have their own semaphore because
+semaphores queue FIFO and a big cluster's node goroutines would otherwise delay every other collector.
+`limit.Configure` is called from `main` before the collectors start. `kubectl port-forward` is deliberately
+unbounded — see the note on `k8s.PreparePortforwarding`.
+
+Anything that can block forever needs a bound, since it now occupies a slot: `AddCommandOutputOptions.Timeout`
+for child processes (started only after the slot is acquired, so queueing does not eat the budget — pass a
+timeout instead of a deadline-carrying context), `stallTimeout` for HTTP responses, and the tools inside
+`kubectl debug` ephemeral containers carry their own limits (`k8s.curlArgs`, traceroute's `-m`/`-w`) so their
+diagnostic output finishes before the outer `ephemeralContainerTimeout` kills it.
+
 ### Configuration (`config/config.go`)
 
 One `Config` struct is the single source of truth for defaults, the `steadybit-debug.yml` file format
@@ -53,22 +68,36 @@ One `Config` struct is the single source of truth for defaults, the `steadybit-d
 defaults in `newConfig()` → `steadybit-debug.yml` in the CWD → CLI flags. Adding an option means adding one
 field with both tag sets — nothing else to register.
 
-`cfg.Kubernetes.Client()` prefers in-cluster config and falls back to the kubeconfig path; it is called
-repeatedly by collectors rather than cached.
+`cfg.Kubernetes.Client()` prefers in-cluster config and falls back to the kubeconfig path. It is called
+repeatedly by the collectors but creates the clientset only once (package-level cache guarded by a mutex, only
+successful creations are cached) — hence the raised `QPS`/`Burst`, since all collectors share one rate limiter.
 
 ### Output layer (`output/`)
 
-Everything written into the archive goes through one of these, and each prepends a header with the executed
-command, start time, any error, and total execution time:
+Everything written into the archive goes through one of these:
 
-- `AddCommandOutput` (`cmd.go`) — runs an external command, captures combined output. With `Executions > 1`
-  the `OutputPath` **must** contain a `%d` for the execution index (used for repeated `kubectl top` /
-  prometheus samples).
-- `AddHttpOutput` / `DoHttp` (`http.go`) — direct HTTP client with mTLS support from `cfg.Tls`, and an
-  automatic retry over HTTPS when a response indicates "Client sent an HTTP request to an HTTPS server".
+- `AddCommandOutput` (`cmd.go`) — runs an external command with stdout and stderr going straight into the output
+  file (never buffered — pod logs do not fit in memory). With `Executions > 1` the `OutputPath` **must** contain
+  a `%d` for the execution index (used for repeated `kubectl top` / prometheus samples); the whole series holds
+  one `limit.Commands` slot, otherwise `DelayBetweenExecutions` would no longer be the interval the samples were
+  taken at. `Timeout` bounds a single execution.
+- `AddHttpOutput` / `DoHttp` (`http.go`) — direct HTTP client with mTLS support from `cfg.Tls` (built once and
+  cached), and an automatic retry over HTTPS when a response indicates "Client sent an HTTP request to an HTTPS
+  server" (`errHttpsRequired`) — that indicator arrives with a `400`, so `doHttpRequest` checks the body before
+  turning a status into an error. `doHttpRequest` owns the request lifecycle and passes the body to a callback;
+  the `progressReader` cancels a request that stops making progress for `stallTimeout`, which bounds a dead
+  port-forward without limiting how long a large response may take. `AddHttpOutput` streams the body into the
+  file and only pretty-prints JSON below `maxBytesForJsonFormatting`; `DoHttp` (for callers that parse the
+  response) errors out beyond `maxBytesForInMemoryResponse` rather than returning a truncated body. Keep it that
+  way — discovery responses reach hundreds of megabytes.
 - `DownloadOutput` (`download.go`) — `curl` download for binary payloads (platform DB export), writes a
   sibling `.log`.
 - `AddJsonOutput` (`json.go`), `WriteToFile` (`output.go`).
+
+The first three share `addOutputFile` (`output.go`), which owns the file format (header with the executed
+command and start time, then the payload, then any error and the total execution time) and hands out the
+`*os.File` the payload is streamed into. Add new collector output on top of it rather than assembling a file
+yourself — and acquire `limit.Commands` in the entry point, not around the individual file.
 
 ### Talking to pods
 
@@ -76,7 +105,11 @@ command, start time, any error, and total execution time:
 port and scrapes the chosen port out of stdout; callers must `defer KillProcess(cmd, podConfig)`. Prefer
 `AddPodHttpMultipleEndpointOutput` when hitting several endpoints on the same port so one forward is reused.
 Connectivity tests (`AddHttpConnectionTest`, `AddTraceroute…`, `AddWebsocket…`) run *inside* the target pod via
-`kubectl debug` ephemeral containers using the images configured under `agent.*Image`.
+`kubectl debug` ephemeral containers using the images configured under `agent.*Image`. They spend nearly all
+their time waiting, so `agent.runConnectionTests` runs them in parallel, bounded per pod because each one adds a
+container to that pod. That works because `ephemeralContainerName` is unique: ephemeral containers are never
+removed from a pod, and `ephemeralContainers` is patched with a merge key on the name, so a reused name would
+address an earlier test's container instead of adding a new one.
 
 ### Extension discovery (`extensions/`)
 

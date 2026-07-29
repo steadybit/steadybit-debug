@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/k8s"
+	"github.com/steadybit/steadybit-debug/limit"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,8 @@ func AddExtensionDebuggingInformation(cfg *config.Config) {
 		wg.Add(1)
 		go func(namespace string) {
 			defer wg.Done()
+			release := limit.Namespaces.Acquire()
+			defer release()
 			findDebugInformationInNamespace(namespace, cfg)
 		}(namespace)
 

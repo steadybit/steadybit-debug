@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/k8s"
+	"github.com/steadybit/steadybit-debug/limit"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/url"
@@ -52,16 +53,29 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name, 10)
 
-		k8s.AddHttpConnectionTest(cfg, filepath.Join(pathForPod, "platform_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl+"/agent")
-		url, err := url.Parse(platformUrl)
-		if err != nil {
+		tester := k8s.NewConnectionTester(cfg, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
+		platformConnectionTests := []func(){
+			func() {
+				tester.AddHttpConnectionTest(filepath.Join(pathForPod, "platform_connection_test.txt"), platformUrl+"/agent")
+			},
+			func() {
+				tester.AddWebsocketCurlHttp1ConnectionTest(filepath.Join(pathForPod, "platform_websocket_http1_connection_test.txt"), platformUrl)
+			},
+			func() {
+				tester.AddWebsocketCurlHttp2ConnectionTest(filepath.Join(pathForPod, "platform_websocket_http2_connection_test.txt"), platformUrl)
+			},
+			func() {
+				tester.AddWebsocketWebsocatConnectionTest(filepath.Join(pathForPod, "platform_websocat_connection_test.txt"), platformUrl)
+			},
+		}
+		if parsedPlatformUrl, err := url.Parse(platformUrl); err != nil {
 			log.Err(err).Msgf("Failed to parse platform url '%s'", platformUrl)
 		} else {
-			k8s.AddTracerouteConnectionTest(cfg, filepath.Join(pathForPod, "platform_traceroute_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, url.Host)
+			platformConnectionTests = append(platformConnectionTests, func() {
+				tester.AddTracerouteConnectionTest(filepath.Join(pathForPod, "platform_traceroute_test.txt"), parsedPlatformUrl.Host)
+			})
 		}
-		k8s.AddWebsocketCurlHttp1ConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocket_http1_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
-		k8s.AddWebsocketCurlHttp2ConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocket_http2_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
-		k8s.AddWebsocketWebsocatConnectionTest(cfg, filepath.Join(pathForPod, "platform_websocat_connection_test.txt"), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, platformUrl)
+		runConnectionTests(cfg, platformConnectionTests)
 
 		k8s.AddPodHttpMultipleEndpointOutput(
 			k8s.AddPodHttpEndpointsOutputOptions{
@@ -122,10 +136,44 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 			PodName:      pod.Name,
 			Config:       cfg,
 		}, cfg)
+		extensionConnectionTests := make([]func(), 0, len(extensionConnections))
 		for idx, extensionConnection := range extensionConnections {
-			k8s.AddHttpConnectionTest(cfg, filepath.Join(pathForPod, fmt.Sprintf("extension_connection_test_%d.txt", idx)), pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, extensionConnection.Url)
+			outputPath := filepath.Join(pathForPod, fmt.Sprintf("extension_connection_test_%d.txt", idx))
+			connectionUrl := extensionConnection.Url
+			extensionConnectionTests = append(extensionConnectionTests, func() {
+				tester.AddHttpConnectionTest(outputPath, connectionUrl)
+			})
 		}
+		runConnectionTests(cfg, extensionConnectionTests)
 	})
+}
+
+// maxParallelConnectionTests bounds how many tests are executed in one pod at the same time. They share the
+// ephemeral container they run in, so this is about not putting too many processes into one pod at once.
+const maxParallelConnectionTests = 8
+
+// runConnectionTests runs the connection tests of one pod in parallel. Each of them waits for a connection
+// attempt that only tells us something once it has run into its timeout, so running them one after another adds
+// minutes per pod for no reason.
+func runConnectionTests(cfg *config.Config, tests []func()) {
+	if cfg.SkipConnectionTests {
+		log.Debug().Msgf("Skipping %d connection tests", len(tests))
+		return
+	}
+
+	bound := limit.New(maxParallelConnectionTests)
+
+	var wg sync.WaitGroup
+	for _, test := range tests {
+		wg.Add(1)
+		go func(test func()) {
+			defer wg.Done()
+			release := bound.Acquire()
+			defer release()
+			test()
+		}(test)
+	}
+	wg.Wait()
 }
 
 func identifyPodPort(pod *v1.Pod) int {

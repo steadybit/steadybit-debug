@@ -5,13 +5,15 @@
 package output
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
+	"github.com/steadybit/steadybit-debug/limit"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 type DownloadOptions struct {
@@ -22,30 +24,25 @@ type DownloadOptions struct {
 }
 
 func DownloadOutput(opts DownloadOptions) {
-	start := time.Now()
-	outputPathLog := opts.OutputPath + ".log"
+	release := limit.Commands.Acquire()
+	defer release()
 
 	commandArgs := getCommandArgs(opts, false)
 
-	logContent := fmt.Sprintf("# Executed command: %s %s", "curl", strings.Join(commandArgs, " "))
-	logContent = fmt.Sprintf("%s\n# Started at: %s", logContent, time.Now().Format(time.RFC3339))
-
-	out, err := doCurl(commandArgs)
-	fmt.Println(string(out))
-	if err != nil {
-		logContent = fmt.Sprintf("%s\n# Resulted in error: %s", logContent, err)
-	}
-	if strings.Contains(string(out), "Client sent an HTTP request to an HTTPS server") {
-		commandArgs := getCommandArgs(opts, true)
-		out, err = doCurl(commandArgs)
-		if err != nil {
-			logContent = fmt.Sprintf("%s\n# Resulted in error: %s", logContent, err)
+	addOutputFile(opts.OutputPath+".log", "curl "+strings.Join(commandArgs, " "), func(out *os.File) error {
+		// curl writes the payload itself, only its diagnostics end up in the log
+		result, err := doCurl(commandArgs)
+		if bytes.Contains(result, []byte(httpsRequiredIndicator)) {
+			// keep what the first attempt reported, it may have left a partial file behind
+			_, _ = out.Write(result)
+			if err != nil {
+				_, _ = fmt.Fprintf(out, "\n# First attempt resulted in error: %s\n", err)
+			}
+			result, err = doCurl(getCommandArgs(opts, true))
 		}
-	}
-	totalTime := time.Now().Sub(start)
-	logContent = fmt.Sprintf("%s\n\n# Total execution time: %d millis", logContent, totalTime.Milliseconds())
-
-	WriteToFile(outputPathLog, []byte(strings.TrimSpace(logContent)))
+		_, _ = out.Write(result)
+		return err
+	})
 }
 
 func getCommandArgs(opts DownloadOptions, insecure bool) []string {

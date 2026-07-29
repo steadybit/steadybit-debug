@@ -111,6 +111,9 @@ func TraverseExtensionEndpoints(options TraverseExtensionEndpointsOptions) {
 		urlsToCurlSlice = append(urlsToCurlSlice, urlsToCurl{Method: string(eventListener.Method), Path: eventListener.Path})
 	}
 
+	// crawling every advertised endpoint means asking for responses that cannot succeed: an event listener, for
+	// example, is a POST that the platform sends an event body to, so it answers this empty request with an error.
+	// The response still belongs in the archive, but its failure is not worth reporting to the user.
 	var wg sync.WaitGroup
 	for _, urlToCurl := range urlsToCurlSlice {
 		outputPath := getOutputPath(options.PathForPod, urlToCurl)
