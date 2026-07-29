@@ -61,6 +61,19 @@ agent:
 To learn more about all the available configuration options please inspect
 the Go `Config` [struct definition](https://github.com/steadybit/steadybit-debug/blob/main/config/config.go#L11).
 
+### Resource Usage
+
+steadybit-debug collects from multiple pods and nodes in parallel, each
+collection spawning `kubectl` and `curl` processes. On large clusters you can
+lower the number of pods and nodes that are collected in parallel to reduce the
+memory and CPU footprint of the tool - at the cost of a longer runtime:
+
+```
+steadybit-debug --max-concurrency 2
+```
+
+The default is `8`, a value of `0` disables the limit.
+
 ## MTLS Support for extensions
 If you configured your extensions to use mTLS between agent and extension, you need to provide the cert and key files to steadybit-debug. You can do this by adding the following to your `steadybit-debug.yml` file:
 

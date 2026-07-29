@@ -8,6 +8,7 @@ import (
 	"flag"
 	"github.com/jessevdk/go-flags"
 	"github.com/rs/zerolog/log"
+	"github.com/steadybit/steadybit-debug/limit"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -15,12 +16,15 @@ import (
 	"k8s.io/client-go/util/homedir"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 type Config struct {
 	OutputPath           string                     `yaml:"outputPath" short:"o" long:"output" description:"Path to output directory that will contain the debugging information"`
 	NoCleanup            bool                       `yaml:"noCleanup" long:"no-cleanup" description:"Skip output directory deletion on command completion?"`
+	MaxConcurrency       int                        `yaml:"maxConcurrency" long:"max-concurrency" description:"Maximum number of pods/nodes collected in parallel. Lower it to reduce the memory and CPU footprint on large clusters, 0 disables the limit"`
+	SkipConnectionTests  bool                       `yaml:"skipConnectionTests" long:"skip-connection-tests" description:"Skip the connectivity tests that run inside the agent pod. They need an ephemeral container, which a pod with a restrictive security context refuses to start"`
 	Kubernetes           KubernetesConfig           `yaml:"kubernetes"`
 	Platform             PlatformConfig             `yaml:"platform"`
 	PlatformPortSplitter PlatformportSplitterConfig `yaml:"platform-port-splitter"`
@@ -56,7 +60,32 @@ type KubernetesConfig struct {
 	KubeConfigPath string `yaml:"kubeConfigPath" long:"kube-config" description:"Path to Kubernetes config"`
 }
 
+var (
+	clientMutex  sync.Mutex
+	cachedClient *kubernetes.Clientset
+)
+
+// Client returns the shared Kubernetes client. The client is created once and reused by all collectors - a
+// client per call keeps a connection pool and a rate limiter of its own, which adds up to a significant amount
+// of memory when the collectors run against a large cluster.
 func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
+	clientMutex.Lock()
+	defer clientMutex.Unlock()
+
+	if cachedClient != nil {
+		return cachedClient, nil
+	}
+
+	clientset, err := c.newClient()
+	if err != nil {
+		return nil, err
+	}
+
+	cachedClient = clientset
+	return cachedClient, nil
+}
+
+func (c KubernetesConfig) newClient() (*kubernetes.Clientset, error) {
 	config, err := rest.InClusterConfig()
 	if err == nil {
 		log.Debug().Msgf("Steadybit-Debug is running inside a cluster, config found")
@@ -80,6 +109,10 @@ func (c KubernetesConfig) Client() (*kubernetes.Clientset, error) {
 
 	config.UserAgent = "steadybit-debug"
 	config.Timeout = time.Second * 10
+	// the shared client uses a single rate limiter for all collectors, the client-go default of 5 requests per
+	// second is not enough to list the resources of a large cluster within the configured timeout
+	config.QPS = 50
+	config.Burst = 100
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Debug().Err(err).Msgf("Could not create kubernetes client")
@@ -110,8 +143,10 @@ func newConfig() Config {
 	}
 
 	return Config{
-		OutputPath: outputPath,
-		NoCleanup:  false,
+		OutputPath:          outputPath,
+		NoCleanup:           false,
+		MaxConcurrency:      limit.DefaultMaxConcurrency,
+		SkipConnectionTests: false,
 		Kubernetes: KubernetesConfig{
 			KubeConfigPath: kubeConfigPath,
 		},

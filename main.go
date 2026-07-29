@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/debugrun"
+	"github.com/steadybit/steadybit-debug/limit"
 	"github.com/steadybit/steadybit-debug/output"
 	"io"
 	"os"
@@ -19,6 +20,7 @@ func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	cfg := config.GetConfig()
+	limit.Configure(cfg.MaxConcurrency)
 	output.AddOutputDirectory(&cfg)
 	addLoggingToFile(&cfg)
 

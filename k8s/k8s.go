@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
+	"github.com/steadybit/steadybit-debug/limit"
 	"github.com/steadybit/steadybit-debug/output"
-	"io"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,7 +20,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -58,47 +57,6 @@ func AddDescription(config *config.Config, outputPath string, kind string, names
 		OutputPath:       outputPath,
 		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
 		LogError:         true,
-	})
-}
-
-func AddHttpConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
-	log.Debug().Msgf("Adding http connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
-	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Agent.CurlImage, "curl", []string{"-v", url}, nil)
-}
-
-func AddTracerouteConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, host string) {
-	log.Debug().Msgf("Adding traceroute connection test for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	addWithEphemeralContainer(ctx, config, outputPath, namespace, name, containerName, config.Agent.TracerouteImage, "traceroute", []string{host}, nil)
-}
-
-func AddWebsocketCurlHttp1ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
-	log.Debug().Msgf("Adding curl http1 connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
-	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Agent.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v", "--http1.1"}, nil)
-}
-
-func AddWebsocketCurlHttp2ConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
-	log.Debug().Msgf("Adding curl http2 connection test via curl for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
-	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Agent.CurlImage, "curl", []string{"-v", "--http1.1", url + "/ws", "-H", "upgrade: websocket", "-H", "connection: Upgrade", "-H", "sec-websocket-key: dummy", "-H", "sec-websocket-Version: 13", "-v"}, nil)
-}
-
-func AddWebsocketWebsocatConnectionTest(config *config.Config, outputPath string, namespace string, name string, containerName string, url string) {
-	log.Debug().Msgf("Adding websocat connection test for '%s' in namespace '%s' to '%s'", name, namespace, outputPath)
-	wsUrl := strings.ReplaceAll(url, "https://", "wss://")
-	wsUrl = strings.ReplaceAll(wsUrl, "http://", "ws://")
-	addWithEphemeralContainer(context.Background(), config, outputPath, namespace, name, containerName, config.Agent.WebsocatImage, "websocat", []string{wsUrl + "/ws", "-v"}, strings.NewReader(" "))
-}
-
-func addWithEphemeralContainer(ctx context.Context, config *config.Config, outputPath string, namespace string, name string, containerName string, imageName string, command string, args []string, stdin io.Reader) {
-	commandArgs := []string{"debug", "-it", name, "-n", namespace, "--target", containerName, "--image", imageName, "-c", "steadybit-debug-" + strconv.Itoa(int(time.Now().Unix())), "--", command}
-	commandArgs = append(commandArgs, args...)
-	output.AddCommandOutput(ctx, output.AddCommandOutputOptions{
-		Config:           config,
-		CommandName:      "kubectl",
-		CommandArgs:      commandArgs,
-		OutputPath:       outputPath,
-		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
 	})
 }
 
@@ -144,6 +102,8 @@ func doWithPods(podList *v1.PodList, fn func(pod *v1.Pod, idx int)) {
 		idx := idx
 		go func(pod *v1.Pod) {
 			defer wg.Done()
+			release := limit.Items.Acquire()
+			defer release()
 			fn(pod, idx)
 		}(&podForAsyncFunction)
 	}
@@ -199,6 +159,8 @@ func ForEachNode(cfg *config.Config, fn func(node *v1.Node)) {
 		nodeForAsyncFunction := node
 		go func(node *v1.Node) {
 			defer wg.Done()
+			release := limit.Nodes.Acquire()
+			defer release()
 			fn(node)
 		}(&nodeForAsyncFunction)
 	}
@@ -208,9 +170,11 @@ func ForEachNode(cfg *config.Config, fn func(node *v1.Node)) {
 func AddLogs(cfg *config.Config, path string, namespace string, name string) {
 	log.Debug().Msgf("Adding logs for '%s' in namespace '%s' to '%s'", name, namespace, path)
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
-		Config:           cfg,
-		CommandName:      "kubectl",
-		CommandArgs:      []string{"logs", "-n", namespace, "--all-containers", name},
+		Config:      cfg,
+		CommandName: "kubectl",
+		// --ignore-errors keeps a container that cannot start - an ephemeral container of an earlier run, for
+		// example - from failing the whole request and taking the logs of every other container with it
+		CommandArgs:      []string{"logs", "-n", namespace, "--all-containers", "--ignore-errors", name},
 		OutputPath:       path,
 		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
 		LogError:         true,
@@ -222,7 +186,7 @@ func AddPreviousLogs(cfg *config.Config, path string, namespace string, name str
 	output.AddCommandOutput(context.Background(), output.AddCommandOutputOptions{
 		Config:           cfg,
 		CommandName:      "kubectl",
-		CommandArgs:      []string{"logs", "-n", namespace, "--previous", "--all-containers", name},
+		CommandArgs:      []string{"logs", "-n", namespace, "--previous", "--all-containers", "--ignore-errors", name},
 		OutputPath:       path,
 		ExecutionContext: fmt.Sprintf("%s/%s", namespace, name),
 	})
@@ -448,6 +412,9 @@ func KillProcess(cmd *exec.Cmd, options PodConfig) {
 	}
 }
 
+// PreparePortforwarding deliberately does not acquire limit.Commands: the port-forward stays alive while the
+// requests through it run, so it would block the very executions it exists for. Its callers run within a
+// limit.Items slot, which is what bounds the number of concurrent port-forwards.
 func PreparePortforwarding(options PodConfig, port int) (string, *exec.Cmd, error) {
 	cmd := exec.Command("kubectl", "port-forward", "-n", options.PodNamespace, fmt.Sprintf("pod/%s", options.PodName), fmt.Sprintf(":%d", port))
 	log.Debug().Msgf("Executing: %s", cmd.String())
