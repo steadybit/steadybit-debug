@@ -66,7 +66,7 @@ func AddHttpOutput(opts AddHttpOutputOptions) {
 
 	command := fmt.Sprintf("%s %s", opts.Method, opts.URL.String())
 
-	addOutputFile(opts.OutputPath, command, func(out *os.File) error {
+	addOutputFile(opts.OutputPath, command, nil, func(out *os.File) error {
 		err := streamHttp(HttpOptions{
 			Config:     opts.Config,
 			Method:     opts.Method,

@@ -74,6 +74,20 @@ steadybit-debug --max-concurrency 2
 
 The default is `8`, a value of `0` disables the limit.
 
+### Connectivity Tests
+
+To check whether the agent reaches the platform and its extensions, steadybit-debug
+adds an ephemeral container to the agent pod and runs `curl` in it. The container
+inherits the agent's security context, certificates and key, so the tests present
+what the agent presents - nothing to configure, and no credentials in the archive.
+
+Kubernetes cannot remove an ephemeral container again, so each run leaves an entry in
+the agent pod's spec until the pod restarts. To leave the pod untouched:
+
+```
+steadybit-debug --skip-connection-tests
+```
+
 ## MTLS Support for extensions
 If you configured your extensions to use mTLS between agent and extension, you need to provide the cert and key files to steadybit-debug. You can do this by adding the following to your `steadybit-debug.yml` file:
 
@@ -162,8 +176,7 @@ it collected for your installation!
 │           ├── logs.txt
 │           ├── logs_previous.txt
 │           ├── platform_connection_test.txt
-│           ├── platform_traceroute_test.txt
-│           ├── platform_websocat_connection_test.txt
+│           ├── platform_websocket_connection_test.txt
 │           ├── platform_websocket_http1_connection_test.txt
 │           ├── platform_websocket_http2_connection_test.txt
 │           ├── prometheus_metrics.0.txt
