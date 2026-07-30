@@ -2,12 +2,10 @@ package output
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
 	"github.com/steadybit/steadybit-debug/limit"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -21,9 +19,10 @@ type AddCommandOutputOptions struct {
 	OutputPath             string
 	Executions             int
 	DelayBetweenExecutions *time.Duration
-	Stdin                  io.Reader
 	ExecutionContext       string
 	LogError               bool
+	// Notes are recorded in the output file, for what the reader has to know to interpret it
+	Notes []string
 	// Timeout limits a single execution, starting once it acquired an execution slot. Zero means no limit.
 	Timeout time.Duration
 }
@@ -63,7 +62,7 @@ func AddCommandOutput(ctx context.Context, opts AddCommandOutputOptions) {
 func addCommandOutputWithoutLoop(ctx context.Context, opts AddCommandOutputOptions, outputPath string) {
 	command := fmt.Sprintf("%s %s", opts.CommandName, strings.Join(opts.CommandArgs, " "))
 
-	addOutputFile(outputPath, command, func(out *os.File) error {
+	addOutputFile(outputPath, command, opts.Notes, func(out *os.File) error {
 		if opts.Timeout > 0 {
 			var cancel context.CancelFunc
 			ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
@@ -73,7 +72,6 @@ func addCommandOutputWithoutLoop(ctx context.Context, opts AddCommandOutputOptio
 		cmd := exec.CommandContext(ctx, opts.CommandName, opts.CommandArgs...)
 		log.Debug().Msgf("Executing: %s", cmd.String())
 
-		cmd.Stdin = opts.Stdin
 		// the same file for both streams makes os/exec pass a single descriptor to the child, which keeps the
 		// output interleaved in the order it was written - as it was with cmd.CombinedOutput()
 		cmd.Stdout = out
@@ -81,11 +79,6 @@ func addCommandOutputWithoutLoop(ctx context.Context, opts AddCommandOutputOptio
 
 		err := cmd.Run()
 		if err != nil {
-			// a caller that gave up on the command knows why, which is more useful than the kill signal the command
-			// reports for it
-			if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
-				err = cause
-			}
 			event := log.Debug()
 			if opts.LogError {
 				event = log.Error()

@@ -74,7 +74,7 @@ func CreateFile(path string) (*os.File, error) {
 //
 // Acquiring limit.Commands is up to the caller: a series of repeated executions has to hold one slot for the
 // whole series, otherwise the delay between the samples is no longer the delay that was asked for.
-func addOutputFile(outputPath string, command string, write func(out *os.File) error) {
+func addOutputFile(outputPath string, command string, notes []string, write func(out *os.File) error) {
 	start := time.Now()
 
 	file, err := CreateFile(outputPath)
@@ -86,7 +86,11 @@ func addOutputFile(outputPath string, command string, write func(out *os.File) e
 		_ = file.Close()
 	}()
 
-	_, _ = fmt.Fprintf(file, "# Executed command: %s\n# Started at: %s\n\n", command, start.Format(time.RFC3339))
+	_, _ = fmt.Fprintf(file, "# Executed command: %s\n# Started at: %s\n", command, start.Format(time.RFC3339))
+	for _, note := range notes {
+		_, _ = fmt.Fprintf(file, "# %s\n", note)
+	}
+	_, _ = fmt.Fprint(file, "\n")
 
 	if err := write(file); err != nil {
 		_, _ = fmt.Fprintf(file, "\n# Resulted in error: %s", err)
@@ -98,7 +102,7 @@ func addOutputFile(outputPath string, command string, write func(out *os.File) e
 // AddFailureOutput records a collection step that could not be executed at all, so that the archive says why
 // instead of leaving the file empty or absent.
 func AddFailureOutput(outputPath string, command string, err error) {
-	addOutputFile(outputPath, command, func(*os.File) error {
+	addOutputFile(outputPath, command, nil, func(*os.File) error {
 		return err
 	})
 }

@@ -4,7 +4,9 @@
 package k8s
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/steadybit/steadybit-debug/config"
@@ -12,7 +14,9 @@ import (
 	"github.com/steadybit/steadybit-debug/output"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -69,6 +73,15 @@ type ConnectionTester struct {
 	namespace       string
 	pod             string
 	targetContainer string
+	// customization is what the ephemeral containers inherit from the container they target
+	customization *debugCustomization
+	// platformTls and extensionTls are the TLS settings the target container uses for those two destinations
+	platformTls  []string
+	extensionTls []string
+	// hasAgentKey is set when the target container is given the key the agent authenticates with
+	hasAgentKey bool
+	// authProvider is how the agent authenticates, which decides what the platform accepts
+	authProvider string
 
 	mutex      sync.Mutex
 	containers map[string]*sharedContainer
@@ -80,74 +93,253 @@ type sharedContainer struct {
 	err  error
 }
 
-func NewConnectionTester(cfg *config.Config, namespace string, pod string, targetContainer string) *ConnectionTester {
+func NewConnectionTester(cfg *config.Config, pod *v1.Pod, targetContainer string) *ConnectionTester {
 	return &ConnectionTester{
 		config:          cfg,
-		namespace:       namespace,
-		pod:             pod,
+		namespace:       pod.Namespace,
+		pod:             pod.Name,
 		targetContainer: targetContainer,
+		customization:   customizationForContainer(pod, targetContainer),
+		platformTls:     platformTlsArgs(pod, targetContainer),
+		extensionTls:    extensionTlsArgs(pod, targetContainer),
+		hasAgentKey:     authenticatesWithAgentKey(pod, targetContainer),
+		authProvider:    literalEnv(pod, targetContainer)[envAuthProvider],
 		containers:      make(map[string]*sharedContainer),
 	}
 }
 
-func (t *ConnectionTester) AddHttpConnectionTest(outputPath string, url string) {
-	log.Debug().Msgf("Adding http connection test via curl for '%s' in namespace '%s' to '%s'", t.pod, t.namespace, outputPath)
-	t.exec(outputPath, t.config.Agent.CurlImage, curlArgs("-v", url)...)
+// debugCustomization is the partial container spec that `kubectl debug --custom` merges into the ephemeral
+// container. A debug container inherits nothing from the container it targets, which is why it cannot start in a
+// pod that demands a non-root user: the kubelet has no numeric UID to verify it against. Handing it the target's
+// own security context solves that, and the target's volume mounts let the test read the same certificates the
+// container under test uses.
+type debugCustomization struct {
+	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty"`
+	VolumeMounts    []v1.VolumeMount    `json:"volumeMounts,omitempty"`
+	// Env is passed through as it is written in the pod, so a value coming from a secret is resolved by Kubernetes
+	// inside the container and never has to be read here
+	Env []v1.EnvVar `json:"env,omitempty"`
+}
+
+// customizationForContainer returns nil when there is nothing to inherit, so that no --custom is passed at all.
+func customizationForContainer(pod *v1.Pod, containerName string) *debugCustomization {
+	for _, container := range pod.Spec.Containers {
+		if container.Name != containerName {
+			continue
+		}
+
+		customization := &debugCustomization{VolumeMounts: container.VolumeMounts}
+		for _, variable := range container.Env {
+			if variable.Name == envAgentKey {
+				customization.Env = append(customization.Env, variable)
+			}
+		}
+		if container.SecurityContext != nil {
+			securityContext := container.SecurityContext.DeepCopy()
+			// the tools in the debug container may need to write, and a read-only root filesystem is not something
+			// the pod demands of them - unlike the user they have to run as
+			securityContext.ReadOnlyRootFilesystem = nil
+			customization.SecurityContext = securityContext
+		}
+		if customization.SecurityContext == nil && len(customization.VolumeMounts) == 0 && len(customization.Env) == 0 {
+			return nil
+		}
+		return customization
+	}
+	return nil
+}
+
+// The agent is told about the TLS it uses through these variables, holding paths inside its own container - which
+// is where the tests run too, with the target's volume mounts inherited, so the same paths resolve for them.
+// Mapping them onto curl is what makes a test reproduce what the agent actually does instead of an anonymous
+// request that an extension expecting a client certificate rejects.
+const (
+	envExtensionClientCertChain = "STEADYBIT_AGENT_EXTENSIONS_CLIENT_CERT_CHAIN_FILE"
+	envExtensionClientCertKey   = "STEADYBIT_AGENT_EXTENSIONS_CLIENT_CERT_KEY_FILE"
+	envExtensionClientCertPass  = "STEADYBIT_AGENT_EXTENSIONS_CLIENT_CERT_PASSWORD"
+	envExtensionServerCert      = "STEADYBIT_AGENT_EXTENSIONS_SERVER_CERT"
+	envExtensionInsecure        = "STEADYBIT_AGENT_EXTENSIONS_INSECURE_SKIP_VERIFY"
+	envPlatformInsecure         = "STEADYBIT_AGENT_TLS_INSECURE_SKIP_VERIFY"
+	// envAgentKey holds what the agent authenticates itself with, sent as the X-Agent-Key header
+	envAgentKey = "STEADYBIT_AGENT_KEY"
+	// envAuthProvider decides whether that key is what the platform expects at all. The agent defaults to AGENT_KEY
+	// and can be switched to OAUTH2, where it presents a token fetched from an issuer instead - the key may still be
+	// set in that case, but the platform rejects it, and reporting that as a rejected key would be misleading.
+	envAuthProvider    = "STEADYBIT_AGENT_AUTH_PROVIDER"
+	authProviderOAuth2 = "OAUTH2"
+)
+
+// authenticatesWithAgentKey reports whether presenting the agent key says anything about the agent's credentials.
+func authenticatesWithAgentKey(pod *v1.Pod, containerName string) bool {
+	env := literalEnv(pod, containerName)
+	if _, set := env[envAgentKey]; !set {
+		return false
+	}
+	return !strings.EqualFold(env[envAuthProvider], authProviderOAuth2)
+}
+
+func platformTlsArgs(pod *v1.Pod, containerName string) []string {
+	env := literalEnv(pod, containerName)
+
+	var args []string
+	if env[envPlatformInsecure] == "true" {
+		args = append(args, "--insecure")
+	}
+	return args
+}
+
+func extensionTlsArgs(pod *v1.Pod, containerName string) []string {
+	env := literalEnv(pod, containerName)
+
+	var args []string
+	if chain := env[envExtensionClientCertChain]; chain != "" {
+		if _, protected := env[envExtensionClientCertPass]; protected {
+			// the password is only ever delivered from a secret, and the command being executed is written into the
+			// archive - so the key stays unused rather than putting its password in front of support
+			log.Warn().Msgf("The client certificate of '%s' in namespace '%s' is password protected, so the connection tests cannot present it", pod.Name, pod.Namespace)
+		} else {
+			args = append(args, "--cert", chain)
+			if key := env[envExtensionClientCertKey]; key != "" {
+				args = append(args, "--key", key)
+			}
+		}
+	}
+	if serverCert := env[envExtensionServerCert]; serverCert != "" {
+		args = append(args, "--cacert", serverCert)
+	}
+	if env[envExtensionInsecure] == "true" {
+		args = append(args, "--insecure")
+	}
+	return args
+}
+
+// literalEnv collects the environment of the target container, skipping everything that is not spelled out in the
+// pod: a value taken from a secret is deliberately not resolved, so that it cannot end up on a command line that
+// is written into the archive.
+func literalEnv(pod *v1.Pod, containerName string) map[string]string {
+	env := make(map[string]string)
+	for _, container := range pod.Spec.Containers {
+		if container.Name != containerName {
+			continue
+		}
+		for _, variable := range container.Env {
+			if variable.ValueFrom == nil {
+				env[variable.Name] = variable.Value
+			} else {
+				// recorded without its value, so a caller can tell it is set
+				env[variable.Name] = ""
+			}
+		}
+	}
+	return env
+}
+
+// writeTo stores the customization where kubectl can read it, and returns the function removing it again.
+func (c *debugCustomization) writeTo(directory string) (string, func(), error) {
+	file, err := os.CreateTemp(directory, "steadybit-debug-container-*.json")
+	if err != nil {
+		return "", func() {}, err
+	}
+	remove := func() {
+		_ = os.Remove(file.Name())
+	}
+
+	content, err := json.Marshal(c)
+	if err == nil {
+		_, err = file.Write(content)
+	}
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		remove()
+		return "", func() {}, err
+	}
+	return file.Name(), remove, nil
+}
+
+// AddPlatformConnectionTest reaches the platform the way the agent reaches it. Without the agent key the platform
+// answers 401 to everything, so the test asks twice: once verbosely and anonymously, for the connection itself, and
+// once with the key to find out whether it is accepted.
+func (t *ConnectionTester) AddPlatformConnectionTest(outputPath string, url string) {
+	log.Debug().Msgf("Adding platform connection test via curl for '%s' in namespace '%s' to '%s'", t.pod, t.namespace, outputPath)
+
+	if !t.hasAgentKey {
+		var notes []string
+		if strings.EqualFold(t.authProvider, authProviderOAuth2) {
+			notes = []string{
+				"This agent authenticates with a token it fetches from an OAuth2 issuer, which this test cannot",
+				"reproduce, so the request below carries no credentials and 401 is the expected answer.",
+			}
+		}
+		t.execWithNotes(outputPath, t.config.Agent.CurlImage, notes, curlArgs(t.platformTls, "-v", url)...)
+		return
+	}
+
+	notes := []string{
+		"The second request presents the agent key. A 401 for it means the key was rejected;",
+		"the platform answers an accepted key with 404 or 405, because it authenticates before it routes.",
+	}
+	t.execWithNotes(outputPath, t.config.Agent.CurlImage, notes, "sh", "-c", authenticatedPlatformScript(t.platformTls, url))
+}
+
+// authenticatedPlatformScript keeps the key out of the archive twice over: the header is written for the shell in
+// the container to expand, so only the variable name is recorded, and the request carrying it prints nothing but
+// its status code - curl would otherwise print the header it sent.
+func authenticatedPlatformScript(tls []string, url string) string {
+	return fmt.Sprintf("%s\necho\n%s\n",
+		shellJoin(curlArgs(tls, "-v", url)),
+		shellJoin(curlArgs(tls, "-s", "-o", "/dev/null", "-w", "authenticated request: HTTP %{http_code}\\n"))+
+			" -H \"X-Agent-Key: $"+envAgentKey+"\" "+shellQuote(url))
+}
+
+// shellJoin quotes every argument, so that only what this function adds itself is left for the shell to interpret.
+func shellJoin(args []string) string {
+	quoted := make([]string, 0, len(args))
+	for _, arg := range args {
+		quoted = append(quoted, shellQuote(arg))
+	}
+	return strings.Join(quoted, " ")
+}
+
+func shellQuote(arg string) string {
+	return "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
+}
+
+// AddExtensionConnectionTest reaches an extension the way the agent reaches it, which for a setup using mutual TLS
+// means presenting the agent's client certificate - without it the extension rejects the request and the test says
+// nothing about whether the agent itself can get through.
+func (t *ConnectionTester) AddExtensionConnectionTest(outputPath string, connection Connection) {
+	log.Debug().Msgf("Adding extension connection test via curl for '%s' in namespace '%s' to '%s'", t.pod, t.namespace, outputPath)
+	// whether the connection expects credentials decides how to read a 401 here: as the endpoint being unreachable
+	// or as it answering exactly as it should to a request that carries none
+	notes := []string{fmt.Sprintf("Connection requires authentication: %t", connection.Auth)}
+	t.execWithNotes(outputPath, t.config.Agent.CurlImage, notes, curlArgs(t.extensionTls, "-v", connection.Url)...)
 }
 
 func (t *ConnectionTester) AddWebsocketCurlHttp1ConnectionTest(outputPath string, url string) {
 	log.Debug().Msgf("Adding curl http1 connection test via curl for '%s' in namespace '%s' to '%s'", t.pod, t.namespace, outputPath)
-	t.exec(outputPath, t.config.Agent.CurlImage, curlArgs(append(websocketArgs(url), "--http1.1")...)...)
+	t.exec(outputPath, t.config.Agent.CurlImage, curlArgs(t.platformTls, append(websocketArgs(url), "--http1.1")...)...)
 }
 
 func (t *ConnectionTester) AddWebsocketCurlHttp2ConnectionTest(outputPath string, url string) {
 	log.Debug().Msgf("Adding curl http2 connection test via curl for '%s' in namespace '%s' to '%s'", t.pod, t.namespace, outputPath)
-	t.exec(outputPath, t.config.Agent.CurlImage, curlArgs(websocketArgs(url)...)...)
+	t.exec(outputPath, t.config.Agent.CurlImage, curlArgs(t.platformTls, websocketArgs(url)...)...)
 }
 
-func (t *ConnectionTester) AddTracerouteConnectionTest(outputPath string, host string) {
-	log.Debug().Msgf("Adding traceroute connection test for '%s' in namespace '%s' to '%s'", t.pod, t.namespace, outputPath)
-	// one probe per hop with a one second wait, so an unreachable host is reported well within connectionTestTimeout
-	t.exec(outputPath, t.config.Agent.TracerouteImage, "traceroute", "-m", "15", "-w", "1", "-q", "1", host)
-}
-
-// AddWebsocketWebsocatConnectionTest gets an ephemeral container of its own: the websocat image has no shell to
-// keep a shared container alive with, so the test has to be the container's command.
-func (t *ConnectionTester) AddWebsocketWebsocatConnectionTest(outputPath string, url string) {
-	log.Debug().Msgf("Adding websocat connection test for '%s' in namespace '%s' to '%s'", t.pod, t.namespace, outputPath)
+// AddWebsocketConnectionTest opens an actual websocket, which validates the handshake beyond the plain upgrade
+// the tests above send: curl checks the server's sec-websocket-accept before switching protocols.
+func (t *ConnectionTester) AddWebsocketConnectionTest(outputPath string, url string) {
+	log.Debug().Msgf("Adding websocket connection test via curl for '%s' in namespace '%s' to '%s'", t.pod, t.namespace, outputPath)
 	wsUrl := strings.ReplaceAll(url, "https://", "wss://")
 	wsUrl = strings.ReplaceAll(wsUrl, "http://", "ws://")
-
-	name := ephemeralContainerName()
-
-	// the test is the container's command, so there is nothing to wait for before running it - instead the
-	// container is watched while it runs and the command is given up on as soon as the kubelet says it will never
-	// start, with that reason reported instead of the kill signal. Having terminated is not a failure here: this
-	// container is meant to run the test and exit, and aborting on that would cut its output short.
-	ctx, abort := context.WithCancelCause(context.Background())
-	defer abort(nil)
-	watch, stopWatching := context.WithTimeout(context.Background(), ephemeralContainerStartTimeout)
-	defer stopWatching()
-	go func() {
-		if _, err := t.awaitEphemeralContainer(watch, name); err != nil && watch.Err() == nil {
-			abort(err)
-		}
-	}()
-
-	args := append(t.debugArgs(name, t.config.Agent.WebsocatImage, "-it"), "websocat", wsUrl+"/ws", "-v")
-	output.AddCommandOutput(ctx, output.AddCommandOutputOptions{
-		Config:           t.config,
-		CommandName:      "kubectl",
-		CommandArgs:      args,
-		OutputPath:       outputPath,
-		Stdin:            strings.NewReader(" "),
-		Timeout:          ephemeralContainerStartTimeout + connectionTestTimeout,
-		ExecutionContext: t.executionContext(),
-	})
+	t.exec(outputPath, t.config.Agent.CurlImage, curlArgs(t.platformTls, "-v", wsUrl+"/ws")...)
 }
 
-func curlArgs(args ...string) []string {
-	return append([]string{"curl", "--connect-timeout", curlConnectTimeout, "--max-time", curlMaxTime}, args...)
+// curlArgs assembles a curl invocation. It concatenates into a new slice on purpose: appending to the stored TLS
+// arguments would let the tests running in parallel write into each other's arguments.
+func curlArgs(tls []string, args ...string) []string {
+	return slices.Concat([]string{"curl", "--connect-timeout", curlConnectTimeout, "--max-time", curlMaxTime}, tls, args)
 }
 
 func websocketArgs(url string) []string {
@@ -158,6 +350,10 @@ func websocketArgs(url string) []string {
 
 // exec runs one test in the shared container of imageName, adding that container on first use.
 func (t *ConnectionTester) exec(outputPath string, imageName string, command ...string) {
+	t.execWithNotes(outputPath, imageName, nil, command...)
+}
+
+func (t *ConnectionTester) execWithNotes(outputPath string, imageName string, notes []string, command ...string) {
 	container, err := t.container(imageName)
 	if err != nil {
 		// the reason was reported once when the container failed, so this only says which test it costs
@@ -175,6 +371,7 @@ func (t *ConnectionTester) exec(outputPath string, imageName string, command ...
 		CommandArgs:      args,
 		OutputPath:       outputPath,
 		Timeout:          connectionTestTimeout,
+		Notes:            notes,
 		ExecutionContext: t.executionContext(),
 	})
 }
@@ -205,11 +402,13 @@ func (t *ConnectionTester) startContainer(imageName string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ephemeralContainerStartTimeout)
 	defer cancel()
 
-	release := limit.Commands.Acquire()
-	cmd := exec.CommandContext(ctx, "kubectl", append(t.debugArgs(name, imageName), "sleep", keepAlive)...)
-	log.Debug().Msgf("Executing: %s", cmd.String())
-	out, err := cmd.CombinedOutput()
-	release()
+	out, err := t.addEphemeralContainer(ctx, name, imageName, t.customization)
+	if err != nil && t.customization != nil && bytes.Contains(out, []byte("unknown flag: --custom")) {
+		// kubectl learned --custom in 1.30; an older one can only add a container that inherits nothing, which is
+		// still what it did before this was passed
+		log.Debug().Msgf("This kubectl does not know 'kubectl debug --custom', the connection tests cannot inherit anything from '%s'", t.targetContainer)
+		out, err = t.addEphemeralContainer(ctx, name, imageName, nil)
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to add ephemeral container: %s: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -225,10 +424,28 @@ func (t *ConnectionTester) startContainer(imageName string) (string, error) {
 	return name, nil
 }
 
-func (t *ConnectionTester) debugArgs(name string, imageName string, extra ...string) []string {
-	args := []string{"debug"}
-	args = append(args, extra...)
-	return append(args, t.pod, "-n", t.namespace, "--target", t.targetContainer, "--image", imageName, "-c", name, "--")
+func (t *ConnectionTester) addEphemeralContainer(ctx context.Context, name string, imageName string, customization *debugCustomization) ([]byte, error) {
+	args := t.debugArgs(name, imageName)
+	if customization != nil {
+		path, remove, err := customization.writeTo(os.TempDir())
+		if err != nil {
+			return nil, err
+		}
+		defer remove()
+		args = append(args, "--custom", path)
+	}
+	args = append(args, "--", "sleep", keepAlive)
+
+	release := limit.Commands.Acquire()
+	defer release()
+
+	cmd := exec.CommandContext(ctx, "kubectl", args...)
+	log.Debug().Msgf("Executing: %s", cmd.String())
+	return cmd.CombinedOutput()
+}
+
+func (t *ConnectionTester) debugArgs(name string, imageName string) []string {
+	return []string{"debug", t.pod, "-n", t.namespace, "--target", t.targetContainer, "--image", imageName, "-c", name}
 }
 
 // awaitEphemeralContainer polls until the container has left the pending state and reports what it reached, or

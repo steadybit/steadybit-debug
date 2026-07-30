@@ -58,8 +58,8 @@ unbounded — see the note on `k8s.PreparePortforwarding`.
 Anything that can block forever needs a bound, since it now occupies a slot: `AddCommandOutputOptions.Timeout`
 for child processes (started only after the slot is acquired, so queueing does not eat the budget — pass a
 timeout instead of a deadline-carrying context), `stallTimeout` for HTTP responses, and the tools inside
-`kubectl debug` ephemeral containers carry their own limits (`k8s.curlArgs`, traceroute's `-m`/`-w`) so their
-diagnostic output finishes before the outer `ephemeralContainerTimeout` kills it.
+`kubectl debug` ephemeral containers carry their own limits (`k8s.curlArgs`) so their diagnostic output finishes
+before the outer `ephemeralContainerTimeout` kills it.
 
 ### Configuration (`config/config.go`)
 
@@ -104,12 +104,28 @@ yourself — and acquire `limit.Commands` in the entry point, not around the ind
 `k8s/k8s.go` is the shared toolbox. `PreparePortforwarding` starts `kubectl port-forward` with a random local
 port and scrapes the chosen port out of stdout; callers must `defer KillProcess(cmd, podConfig)`. Prefer
 `AddPodHttpMultipleEndpointOutput` when hitting several endpoints on the same port so one forward is reused.
-Connectivity tests (`AddHttpConnectionTest`, `AddTraceroute…`, `AddWebsocket…`) run *inside* the target pod via
-`kubectl debug` ephemeral containers using the images configured under `agent.*Image`. They spend nearly all
-their time waiting, so `agent.runConnectionTests` runs them in parallel, bounded per pod because each one adds a
-container to that pod. That works because `ephemeralContainerName` is unique: ephemeral containers are never
-removed from a pod, and `ephemeralContainers` is patched with a merge key on the name, so a reused name would
-address an earlier test's container instead of adding a new one.
+Connectivity tests (`ConnectionTester` in `connectiontest.go`) run *inside* the target pod via a `kubectl debug`
+ephemeral container using `agent.curlImage`, and are executed in it with `kubectl exec` — one container serves
+every test of a pod, because Kubernetes never removes an ephemeral container from a pod again. They spend nearly
+all their time waiting, so `agent.runConnectionTests` runs them in parallel, bounded per pod. `ephemeralContainerName`
+must stay unique: `ephemeralContainers` is patched with a merge key on the name, so a reused name would address an
+earlier container instead of adding a new one.
+
+A debug container inherits **nothing** from the container it targets, which is why it cannot even start in a pod
+demanding a non-root user — the kubelet has no numeric UID to verify. `customizationForContainer` therefore hands
+kubectl the target's own security context, volume mounts and agent-key env entry via `--custom` (minus
+`readOnlyRootFilesystem`, since the tools may need to write), and `platformTlsArgs`/`extensionTlsArgs` turn the
+agent's own TLS environment into curl flags so a test presents what the agent presents. The target is
+`agent.identifyAgentContainer`, **not** `Containers[0]` — that one is the autoregistration sidecar, which has none
+of this.
+
+Credentials must never reach the archive, which records every executed command: only env entries with a literal
+value are read (the client key password comes from a secret), and the agent key is referenced by name for the
+container's shell to expand, with its request printing only a status code because `curl -v` prints the headers it
+sends.
+
+Two tests were removed rather than left failing: traceroute needs `CAP_NET_RAW`, which the chart's agents drop,
+and websocat is only published for amd64 — curl speaks `wss://` itself, so it does that test now.
 
 ### Extension discovery (`extensions/`)
 

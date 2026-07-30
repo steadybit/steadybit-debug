@@ -29,7 +29,7 @@ func DownloadOutput(opts DownloadOptions) {
 
 	commandArgs := getCommandArgs(opts, false)
 
-	addOutputFile(opts.OutputPath+".log", "curl "+strings.Join(commandArgs, " "), func(out *os.File) error {
+	addOutputFile(opts.OutputPath+".log", "curl "+strings.Join(commandArgs, " "), nil, func(out *os.File) error {
 		// curl writes the payload itself, only its diagnostics end up in the log
 		result, err := doCurl(commandArgs)
 		if bytes.Contains(result, []byte(httpsRequiredIndicator)) {

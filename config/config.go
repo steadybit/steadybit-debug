@@ -44,11 +44,9 @@ type PlatformportSplitterConfig struct {
 }
 
 type AgentConfig struct {
-	StatefulSet     string `yaml:"statefulSet" long:"agent-stateful-set" description:"Kubernetes stateful set name of the Steadybit agent"`
-	Namespace       string `yaml:"namespace" long:"agent-namespace" description:"Kubernetes namespace name of the Steadybit agent"`
-	CurlImage       string `yaml:"curlImage" long:"agent-curl-image" description:"Image to use for connection testing with curl installed"`
-	WebsocatImage   string `yaml:"websocatImage" long:"agent-websocat-image" description:"Image to use for connection testing with websocat installed"`
-	TracerouteImage string `yaml:"tracerouteImage" long:"agent-traceroute-image" description:"Image to use for connection testing with traceroute installed"`
+	StatefulSet string `yaml:"statefulSet" long:"agent-stateful-set" description:"Kubernetes stateful set name of the Steadybit agent"`
+	Namespace   string `yaml:"namespace" long:"agent-namespace" description:"Kubernetes namespace name of the Steadybit agent"`
+	CurlImage   string `yaml:"curlImage" long:"agent-curl-image" description:"Image to use for connection testing with curl installed"`
 }
 
 type Tls struct {
@@ -160,11 +158,9 @@ func newConfig() Config {
 			Deployment: "platform-port-splitter",
 		},
 		Agent: AgentConfig{
-			Namespace:       "steadybit-agent",
-			StatefulSet:     "steadybit-agent",
-			CurlImage:       "curlimages/curl",
-			WebsocatImage:   "mtilson/websocat",
-			TracerouteImage: "alpine",
+			Namespace:   "steadybit-agent",
+			StatefulSet: "steadybit-agent",
+			CurlImage:   "curlimages/curl",
 		},
 		Tls: Tls{
 			CertChainFile: "",

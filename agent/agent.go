@@ -11,7 +11,6 @@ import (
 	"github.com/steadybit/steadybit-debug/limit"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -53,10 +52,10 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name, 10)
 
-		tester := k8s.NewConnectionTester(cfg, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
+		tester := k8s.NewConnectionTester(cfg, pod, identifyAgentContainer(pod).Name)
 		platformConnectionTests := []func(){
 			func() {
-				tester.AddHttpConnectionTest(filepath.Join(pathForPod, "platform_connection_test.txt"), platformUrl+"/agent")
+				tester.AddPlatformConnectionTest(filepath.Join(pathForPod, "platform_connection_test.txt"), platformUrl+"/agent")
 			},
 			func() {
 				tester.AddWebsocketCurlHttp1ConnectionTest(filepath.Join(pathForPod, "platform_websocket_http1_connection_test.txt"), platformUrl)
@@ -65,15 +64,8 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 				tester.AddWebsocketCurlHttp2ConnectionTest(filepath.Join(pathForPod, "platform_websocket_http2_connection_test.txt"), platformUrl)
 			},
 			func() {
-				tester.AddWebsocketWebsocatConnectionTest(filepath.Join(pathForPod, "platform_websocat_connection_test.txt"), platformUrl)
+				tester.AddWebsocketConnectionTest(filepath.Join(pathForPod, "platform_websocket_connection_test.txt"), platformUrl)
 			},
-		}
-		if parsedPlatformUrl, err := url.Parse(platformUrl); err != nil {
-			log.Err(err).Msgf("Failed to parse platform url '%s'", platformUrl)
-		} else {
-			platformConnectionTests = append(platformConnectionTests, func() {
-				tester.AddTracerouteConnectionTest(filepath.Join(pathForPod, "platform_traceroute_test.txt"), parsedPlatformUrl.Host)
-			})
 		}
 		runConnectionTests(cfg, platformConnectionTests)
 
@@ -139,9 +131,9 @@ func addAgentDebuggingData(cfg *config.Config, outputPath string, namespace stri
 		extensionConnectionTests := make([]func(), 0, len(extensionConnections))
 		for idx, extensionConnection := range extensionConnections {
 			outputPath := filepath.Join(pathForPod, fmt.Sprintf("extension_connection_test_%d.txt", idx))
-			connectionUrl := extensionConnection.Url
+			connection := extensionConnection
 			extensionConnectionTests = append(extensionConnectionTests, func() {
-				tester.AddHttpConnectionTest(outputPath, connectionUrl)
+				tester.AddExtensionConnectionTest(outputPath, connection)
 			})
 		}
 		runConnectionTests(cfg, extensionConnectionTests)
@@ -174,6 +166,22 @@ func runConnectionTests(cfg *config.Config, tests []func()) {
 		}(test)
 	}
 	wg.Wait()
+}
+
+// agentContainerName is what the Helm chart calls the agent container, unconditionally.
+const agentContainerName = "steadybit-agent"
+
+// identifyAgentContainer finds the container the tests should run against and take their settings from. A pod of
+// the agent stateful set also holds the autoregistration extension, and that one comes first - it has neither the
+// agent's certificates nor the environment describing how the agent talks to the platform and its extensions.
+func identifyAgentContainer(pod *v1.Pod) *v1.Container {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == agentContainerName {
+			return &container
+		}
+	}
+
+	return &pod.Spec.Containers[0]
 }
 
 func identifyPodPort(pod *v1.Pod) int {

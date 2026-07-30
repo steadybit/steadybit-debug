@@ -109,3 +109,27 @@ func readFile(t *testing.T, path string) string {
 	}
 	return string(content)
 }
+
+func TestAddCommandOutputRecordsNotes(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "out.txt")
+
+	AddCommandOutput(context.Background(), AddCommandOutputOptions{
+		Config:      &config.Config{},
+		CommandName: "echo",
+		CommandArgs: []string{"hello"},
+		OutputPath:  outputPath,
+		Notes:       []string{"Connection requires authentication: true"},
+	})
+
+	// the note belongs in the header block, which is separated from the payload by an empty line
+	header, payload, found := strings.Cut(readFile(t, outputPath), "\n\n")
+	if !found {
+		t.Fatalf("expected a header followed by the output, got:\n%s", header)
+	}
+	if !strings.Contains(header, "# Connection requires authentication: true") {
+		t.Errorf("expected the note in the header, got:\n%s", header)
+	}
+	if !strings.Contains(payload, "hello") {
+		t.Errorf("expected the command output below the header, got:\n%s", payload)
+	}
+}
