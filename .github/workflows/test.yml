@@ -20,7 +20,8 @@ jobs:
         run: |
           go mod download
           go build .
-          go test ./...
+          go vet ./...
+          go test -race ./...
 
       - name: Snyk test
         uses: snyk/actions/golang@master
