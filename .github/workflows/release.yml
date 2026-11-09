@@ -37,8 +37,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Snyk monitor
-        uses: snyk/actions/golang@master
+        # The snyk CLI on the runner reads the stdlib version from the Go toolchain set up above; the
+        # snyk/actions/golang Docker action uses its own Go and reports a stdlib the binaries don't contain.
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: monitor
+        run: |
+          npm install -g --ignore-scripts snyk@1.1306.1
+          snyk monitor

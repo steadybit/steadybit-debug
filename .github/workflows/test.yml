@@ -25,9 +25,8 @@ jobs:
           go test -race ./...
 
       - name: Snyk test
-        uses: snyk/actions/golang@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: test
-          args: --severity-threshold=high
+        run: |
+          npm install -g --ignore-scripts snyk@1.1306.1
+          snyk test --severity-threshold=high
