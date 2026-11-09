@@ -20,9 +20,12 @@ jobs:
       - name: Fetch all tags
         run: git fetch --force --tags
 
+      # go.mod only states the minimum Go version; build with the latest patch of that minor so the
+      # binaries pick up stdlib security fixes.
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: '1.27'
+          check-latest: true
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
