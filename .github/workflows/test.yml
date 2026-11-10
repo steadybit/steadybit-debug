@@ -14,7 +14,8 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: '1.27'
+          check-latest: true
 
       - name: Build & Test
         run: |
@@ -23,10 +24,10 @@ jobs:
           go vet ./...
           go test -race ./...
 
+      - name: Set up Snyk CLI
+        uses: steadybit/extension-kit/.github/actions/setup-snyk@main # NOSONAR githubactions:S7637 - our own action
+
       - name: Snyk test
-        uses: snyk/actions/golang@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: test
-          args: --severity-threshold=high
+        run: snyk test --severity-threshold=high
