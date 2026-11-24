@@ -32,6 +32,7 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 		k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
 		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name, 10)
+		addEnv(cfg, pod, filepath.Join(pathForPod, "env.yml"))
 
 		k8s.AddPodHttpMultipleEndpointOutput(
 			k8s.AddPodHttpEndpointsOutputOptions{
@@ -42,10 +43,6 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 					Config:       cfg,
 				},
 				EndpointOptions: []k8s.EndpointsOutputOptions{
-					{
-						OutputPath: filepath.Join(pathForPod, "env.yml"),
-						Url:        "http://localhost:9090/actuator/env",
-					},
 					{
 						OutputPath: filepath.Join(pathForPod, "configprops.yml"),
 						Url:        "http://localhost:9090/actuator/configprops",
