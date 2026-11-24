@@ -33,9 +33,8 @@ type Config struct {
 }
 
 type PlatformConfig struct {
-	Deployment     string `yaml:"deployment" long:"platform-deployment" description:"Kubernetes deployment name of the Steadybit platform"`
-	Namespace      string `yaml:"namespace" long:"platform-namespace" description:"Kubernetes namespace name of the Steadybit platform"`
-	ExportDatabase bool   `yaml:"exportDatabase" long:"export-database" description:"Export database?"`
+	Deployment string `yaml:"deployment" long:"platform-deployment" description:"Kubernetes deployment name of the Steadybit platform"`
+	Namespace  string `yaml:"namespace" long:"platform-namespace" description:"Kubernetes namespace name of the Steadybit platform"`
 }
 
 type PlatformportSplitterConfig struct {
@@ -149,9 +148,8 @@ func newConfig() Config {
 			KubeConfigPath: kubeConfigPath,
 		},
 		Platform: PlatformConfig{
-			Namespace:      "steadybit-platform",
-			Deployment:     "steadybit-platform",
-			ExportDatabase: false,
+			Namespace:  "steadybit-platform",
+			Deployment: "steadybit-platform",
 		},
 		PlatformPortSplitter: PlatformportSplitterConfig{
 			Namespace:  "steadybit-platform",

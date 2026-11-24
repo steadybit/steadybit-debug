@@ -36,7 +36,7 @@ Flow in `main.go`: `config.GetConfig()` → `output.AddOutputDirectory` (creates
 
 | Package | Collects from |
 | --- | --- |
-| `platform` | platform Deployment + Spring Boot actuator endpoints on port 9090; optional DB export |
+| `platform` | platform Deployment + Spring Boot actuator endpoints on port 9090 |
 | `platform` (`platformPortSplitter.go`) | platform-port-splitter Deployment |
 | `agent` | agent StatefulSet, its admin endpoints, and connectivity tests towards the platform |
 | `extensions` | every namespace, discovering extensions by annotation |
@@ -90,8 +90,6 @@ Everything written into the archive goes through one of these:
   file and only pretty-prints JSON below `maxBytesForJsonFormatting`; `DoHttp` (for callers that parse the
   response) errors out beyond `maxBytesForInMemoryResponse` rather than returning a truncated body. Keep it that
   way — discovery responses reach hundreds of megabytes.
-- `DownloadOutput` (`download.go`) — `curl` download for binary payloads (platform DB export), writes a
-  sibling `.log`.
 - `AddJsonOutput` (`json.go`), `WriteToFile` (`output.go`).
 
 The first three share `addOutputFile` (`output.go`), which owns the file format (header with the executed

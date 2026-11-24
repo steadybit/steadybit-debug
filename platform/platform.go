@@ -9,7 +9,6 @@ import (
 	"github.com/steadybit/steadybit-debug/k8s"
 	v1 "k8s.io/api/core/v1"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
@@ -26,25 +25,6 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 
 	k8s.ForEachPod(cfg, deployment.Namespace, deployment.Spec.Selector, func(pod *v1.Pod, idx int) {
 		pathForPod := filepath.Join(pathForPlatform, "pods", pod.Name)
-		var wg sync.WaitGroup
-		if idx == 0 && cfg.Platform.ExportDatabase {
-			wg.Add(1)
-			go func() {
-				log.Debug().Msgf("Downloading database export for platform %s", pod.Name)
-				defer wg.Done()
-				//Download Database export
-				k8s.DownloadFromPod(k8s.AddDownloadOutputOptions{
-					PodNamespace: pod.Namespace,
-					PodName:      pod.Name,
-					Config:       cfg,
-					Url:          "http://localhost:9090/actuator/database/export",
-					OutputPath:   filepath.Join(pathForPlatform, "database.zip"),
-					Method:       "GET",
-				})
-			}()
-
-		}
-
 		delay := time.Millisecond * 500
 
 		k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
@@ -91,6 +71,5 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 					},
 				},
 			})
-		wg.Wait()
 	})
 }
