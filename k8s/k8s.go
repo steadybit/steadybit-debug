@@ -235,15 +235,6 @@ type AddPodHttpEndpointOutputOptions struct {
 	DelayBetweenExecutions *time.Duration
 }
 
-type AddDownloadOutputOptions struct {
-	Config       *config.Config
-	OutputPath   string
-	PodNamespace string
-	PodName      string
-	Url          string
-	Method       string
-}
-
 func AddPodHttpMultipleEndpointOutput(options AddPodHttpEndpointsOutputOptions) {
 	log.Debug().Msgf("Adding multiple http endpoints for '%s' in namespace '%s'", options.PodConfig.PodName, options.PodConfig.PodNamespace)
 	forwardingHostWithPort, cmd, err := PreparePortforwarding(PodConfig{
@@ -366,41 +357,6 @@ func AddPodHttpEndpointOutput(options AddPodHttpEndpointOutputOptions) {
 		Executions:             options.Executions,
 		DelayBetweenExecutions: options.DelayBetweenExecutions,
 		ExecutionContext:       fmt.Sprintf("%s/%s", options.PodNamespace, options.PodName),
-	})
-}
-
-func DownloadFromPod(options AddDownloadOutputOptions) {
-	log.Debug().Msgf("Downloading from '%s' in namespace '%s'", options.PodName, options.PodNamespace)
-	downloadUrl, err := url.Parse(options.Url)
-	if err != nil {
-		log.Debug().Msgf("Failed to parse URL '%s'", options.Url)
-		return
-	}
-	port, _ := strconv.Atoi(downloadUrl.Port())
-	forwardingHostWithPort, cmd, err := PreparePortforwarding(PodConfig{
-		PodNamespace: options.PodNamespace,
-		PodName:      options.PodName,
-		Config:       options.Config,
-	}, port)
-	if err != nil {
-		log.Debug().Msgf("Failed to prepare port forwarding. Got error: %s", err)
-		return
-	}
-
-	defer func() {
-		KillProcess(cmd, PodConfig{
-			PodNamespace: options.PodNamespace,
-			PodName:      options.PodName,
-			Config:       options.Config,
-		})
-	}()
-
-	downloadUrl.Host = forwardingHostWithPort
-	output.DownloadOutput(output.DownloadOptions{
-		Config:     options.Config,
-		OutputPath: options.OutputPath,
-		Method:     options.Method,
-		URL:        *downloadUrl,
 	})
 }
 

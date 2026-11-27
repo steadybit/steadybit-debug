@@ -9,7 +9,6 @@ import (
 	"github.com/steadybit/steadybit-debug/k8s"
 	v1 "k8s.io/api/core/v1"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
@@ -26,25 +25,6 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 
 	k8s.ForEachPod(cfg, deployment.Namespace, deployment.Spec.Selector, func(pod *v1.Pod, idx int) {
 		pathForPod := filepath.Join(pathForPlatform, "pods", pod.Name)
-		var wg sync.WaitGroup
-		if idx == 0 && cfg.Platform.ExportDatabase {
-			wg.Add(1)
-			go func() {
-				log.Debug().Msgf("Downloading database export for platform %s", pod.Name)
-				defer wg.Done()
-				//Download Database export
-				k8s.DownloadFromPod(k8s.AddDownloadOutputOptions{
-					PodNamespace: pod.Namespace,
-					PodName:      pod.Name,
-					Config:       cfg,
-					Url:          "http://localhost:9090/actuator/database/export",
-					OutputPath:   filepath.Join(pathForPlatform, "database.zip"),
-					Method:       "GET",
-				})
-			}()
-
-		}
-
 		delay := time.Millisecond * 500
 
 		k8s.AddDescription(cfg, filepath.Join(pathForPod, "description.txt"), "pod", pod.Namespace, pod.Name)
@@ -52,6 +32,7 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 		k8s.AddLogs(cfg, filepath.Join(pathForPod, "logs.txt"), pod.Namespace, pod.Name)
 		k8s.AddPreviousLogs(cfg, filepath.Join(pathForPod, "logs_previous.txt"), pod.Namespace, pod.Name)
 		k8s.AddResourceUsage(cfg, filepath.Join(pathForPod, "top.%d.txt"), pod.Namespace, pod.Name, 10)
+		addEnv(cfg, pod, filepath.Join(pathForPod, "env.yml"))
 
 		k8s.AddPodHttpMultipleEndpointOutput(
 			k8s.AddPodHttpEndpointsOutputOptions{
@@ -62,10 +43,6 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 					Config:       cfg,
 				},
 				EndpointOptions: []k8s.EndpointsOutputOptions{
-					{
-						OutputPath: filepath.Join(pathForPod, "env.yml"),
-						Url:        "http://localhost:9090/actuator/env",
-					},
 					{
 						OutputPath: filepath.Join(pathForPod, "configprops.yml"),
 						Url:        "http://localhost:9090/actuator/configprops",
@@ -91,6 +68,5 @@ func AddPlatformDebuggingInformation(cfg *config.Config) {
 					},
 				},
 			})
-		wg.Wait()
 	})
 }
